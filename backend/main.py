@@ -1,4 +1,4 @@
-from services.ocr_service import OCR_Service
+from backend.services.glmocr_service import OCR_Service
 import os
 from pathlib import Path
 
