@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 
-class Translate_Service:
+class Translate_Tencent_Service:
     def __init__(self, ocr_path=None, device= None):
         tokenizer_path = ocr_path / "tokenizer"
         model_path = ocr_path / "model"

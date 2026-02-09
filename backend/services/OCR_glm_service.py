@@ -4,7 +4,7 @@ import torch
 import os
 from pathlib import Path
 
-class OCR_Service:
+class OCR_Glm_Service:
     def __init__(self, ocr_path=None, device= None):
         processor_path = ocr_path / "processor"
         model_path = ocr_path / "model"
