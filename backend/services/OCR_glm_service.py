@@ -10,9 +10,10 @@ class OCR_Glm_Service:
         model_path = ocr_path / "model"
 
         self.processor = AutoProcessor.from_pretrained(processor_path)
-        self.model = AutoModelForImageTextToText.from_pretrained(model_path)
+        self.model = AutoModelForImageTextToText.from_pretrained(model_path, tie_word_embeddings=False)
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    
+        print("Loaded glm OCR")
+
     def runOCR(self, image_url):
         # image = Image.open(image_url).convert("RGB")
         messages = [

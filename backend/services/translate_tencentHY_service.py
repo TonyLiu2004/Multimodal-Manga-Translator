@@ -11,8 +11,9 @@ class Translate_Tencent_Service:
         model_path = ocr_path / "model"
 
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
-        self.model = AutoModelForCausalLM.from_pretrained(model_path)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path, tie_word_embeddings=False,)
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        print("Loaded Tencent Translate")
     
     def translate(self, text):
         messages = [
