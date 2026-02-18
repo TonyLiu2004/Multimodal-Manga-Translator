@@ -1,12 +1,27 @@
 from ultralytics import YOLO
 from PIL import Image
+from helpers import get_project_root
+from huggingface_hub import hf_hub_download
+from pathlib import Path
 
 class Bubble_Detector_Kiuyha_Service:
-    def __init__(self, path):
+    def __init__(self, path=None):
+        if not path:
+            ROOT = get_project_root()
+            path =  ROOT / "backend" / "models"
+            
         model_path = path / "kiuyha.pt"
-        self.model = YOLO(model_path)
-        print("Loaded Bubble Detector Kiuyha")
 
+        if not model_path.exists():
+            print(f"Kiuyha model not found at {model_path}. Attempting to download")
+            self.load_model()
+
+        if model_path.exists():
+            self.model = YOLO(model_path)
+            print("Loaded Bubble Detector Kiuyha")
+        else:
+            raise FileNotFoundError(f"Error: Could not find or retrieve {model_path}")
+          
     def predict(self, img_path, conf=0.2, iou=0.4, show_labels=True, show_conf=True, imgsz=640):
         results = self.model.predict(
             source=img_path,
@@ -35,7 +50,7 @@ class Bubble_Detector_Kiuyha_Service:
             })
 
         #sort right to left, top to bottom. test more
-        row_height = img_h * 0.2 
+        row_height = img_h * 0.1 
 
         sorted_boxes = sorted(
             boxes_list, 
@@ -46,3 +61,21 @@ class Bubble_Detector_Kiuyha_Service:
         )
         return sorted_boxes
     
+    def load_model(self):
+        ROOT = get_project_root()
+        model_dir = ROOT / "backend" / "models"
+        target_path = model_dir / "kiuyha.pt"
+
+        if target_path.exists():
+            print(f"Kiuya Model already exists at {target_path}")
+            return str(target_path)
+        
+        downloaded_path = hf_hub_download(
+            repo_id="Kiuyha/Manga-Bubble-YOLO",
+            filename="model.pt",
+            local_dir=model_dir
+        )
+
+        final_path = Path(downloaded_path).rename(target_path)
+        print(f"Downloaded Kiuyha bubble detector to: {final_path}")
+        return str(final_path)

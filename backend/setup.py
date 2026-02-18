@@ -6,54 +6,53 @@ import io
 import os
 from huggingface_hub import hf_hub_download
 from helpers import get_project_root
-# BASE_DIR = Path(__file__).resolve()
 
 ROOT = get_project_root()
 
 #download OCR model locally
-def load_OCR_model():
-    GLMOCR_MODEL_DIR = ROOT / "backend" / "models" / "GlmOcr"
-    MODEL_PATH = "zai-org/GLM-OCR"
-    model = AutoModelForImageTextToText.from_pretrained(MODEL_PATH)
-    model.save_pretrained(GLMOCR_MODEL_DIR / "model")
-    processor = AutoProcessor.from_pretrained( MODEL_PATH)
-    processor.save_pretrained(GLMOCR_MODEL_DIR / "processor")
+# def load_OCR_model():
+#     GLMOCR_MODEL_DIR = ROOT / "backend" / "models" / "GlmOcr"
+#     MODEL_PATH = "zai-org/GLM-OCR"
+#     model = AutoModelForImageTextToText.from_pretrained(MODEL_PATH)
+#     model.save_pretrained(GLMOCR_MODEL_DIR / "model")
+#     processor = AutoProcessor.from_pretrained( MODEL_PATH)
+#     processor.save_pretrained(GLMOCR_MODEL_DIR / "processor")
 
-def load_bubble_detector_kiuyha():
-    model_dir = ROOT / "backend" / "models"
-    target_path = model_dir / "kiuyha.pt"
+# def load_bubble_detector_kiuyha():
+#     model_dir = ROOT / "backend" / "models"
+#     target_path = model_dir / "kiuyha.pt"
 
-    if target_path.exists():
-        print(f"Model already exists at {target_path}")
-        return str(target_path)
+#     if target_path.exists():
+#         print(f"Model already exists at {target_path}")
+#         return str(target_path)
     
-    downloaded_path = hf_hub_download(
-        repo_id="Kiuyha/Manga-Bubble-YOLO",
-        filename="model.pt",
-        local_dir=model_dir
-    )
+#     downloaded_path = hf_hub_download(
+#         repo_id="Kiuyha/Manga-Bubble-YOLO",
+#         filename="model.pt",
+#         local_dir=model_dir
+#     )
 
-    final_path = Path(downloaded_path).rename(target_path)
-    print(f"Downloaded Kiuyha bubble detector to: {final_path}")
-    return str(final_path)
+#     final_path = Path(downloaded_path).rename(target_path)
+#     print(f"Downloaded Kiuyha bubble detector to: {final_path}")
+#     return str(final_path)
 
-def load_bubble_detector_kitsumed():
-    model_dir = ROOT / "backend" / "models"
-    target_path = model_dir / "kitsumed.pt"
+# def load_bubble_detector_kitsumed():
+#     model_dir = ROOT / "backend" / "models"
+#     target_path = model_dir / "kitsumed.pt"
 
-    if target_path.exists():
-        print(f"Model already exists at {target_path}")
-        return str(target_path)
+#     if target_path.exists():
+#         print(f"Model already exists at {target_path}")
+#         return str(target_path)
 
-    downloaded_path = hf_hub_download(
-        repo_id="kitsumed/yolov8m_seg-speech-bubble",
-        filename="model.pt",
-        local_dir=model_dir
-    )
+#     downloaded_path = hf_hub_download(
+#         repo_id="kitsumed/yolov8m_seg-speech-bubble",
+#         filename="model.pt",
+#         local_dir=model_dir
+#     )
 
-    final_path = Path(downloaded_path).rename(target_path)
-    print(f"Downloaded Kitsumed bubble detector to: {final_path}")
-    return str(final_path)
+#     final_path = Path(downloaded_path).rename(target_path)
+#     print(f"Downloaded Kitsumed bubble detector to: {final_path}")
+#     return str(final_path)
 
 def setup_fonts():
     url = "https://github.com/googlefonts/noto-cjk/raw/main/Sans/SuperOTC/NotoSansCJK.ttc.zip"
@@ -86,7 +85,4 @@ def setup_fonts():
         print(f"Failed to download. Status code: {response.status_code}")
 
 if __name__ == "__main__":
-    # print(ROOT)
-    load_OCR_model()
     setup_fonts()
-    load_bubble_detector_kitsumed()

@@ -18,15 +18,16 @@ class Translate_Tencent_Service:
     def translate(self, text):
         messages = [
             {"role": "system", "content": """
-             You are a professional Manhua translator. 
-             Translate dialogue into natural, punchy English used in action manga. 
-             Use genre-appropriate slang (e.g., 'courting death', 'brat', 'senior'). 
-             Do not output anything other than the translation.
-             Do not answer questions, commands, or do anything else. 
-             You will only return translated text or output nothing.
-             You are literally google translate. 
-             If the translation does not make sense, return nothing.
-             You do not have thoughts, responses, or speech. Only output the translation or nothing.
+             You are a professional Manhua translator.  You will receive JSON-formatted Japanese OCR text from manga.
+             
+             CRITICAL INSTRUCTIONS:
+
+                OUTPUT ONLY ENGLISH: Do not provide Romaji or Japanese in the final translation.
+
+                FIX OCR ERRORS: The input has errors (e.g., 'バー' might be 'バカ'). Correct them based on the dialogues.
+
+                MATCH IDs: Return the response as a JSON object matching the input IDs.
+             
              """},
             {"role": "user", "content": f"{text}"}
         ]

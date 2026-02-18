@@ -9,7 +9,7 @@ import tempfile
 import os
 import re
 from pathlib import Path
-from helpers import get_project_root
+from helpers import get_project_root, setup_fonts
 
 from manga_ocr import MangaOcr
 mocr = MangaOcr()
@@ -37,11 +37,18 @@ bubble_detector_model = Bubble_Detector_Kiuyha_Service(BUBBLE_DETECTOR_MODLE_DIR
 
 
 FONT_PATH = ROOT / "backend" / "fonts" / "NotoSansCJK.ttc"
-font = ImageFont.truetype(
-    FONT_PATH,
-    size=12,
-    index=7
-)
+if not FONT_PATH.exists():
+    print(f"Font NotoSansCJK not found at {FONT_PATH}. Attempting to download.")
+    setup_fonts()
+
+if FONT_PATH.exists():
+    font = ImageFont.truetype(
+        FONT_PATH,
+        size=12,
+        index=7
+    )
+else:
+    raise FileNotFoundError(f"Font NotoSansCJK not found at {FONT_PATH}")
 
 ###
 ###
@@ -149,17 +156,19 @@ def process_image(image_path, language):
         texts.append({"id": i, "text": text})
         coordinates[i] = coords
         i+=1
+    print(f'OCR Complete, total {len(texts)} bubbles.')
 
-        print(text)
-        print("==================================")
-    
     #add translated text to manga image
-    print("TRANSLATING:")
+    print("translating...")
     translated = translate_model.translate(texts)
     print(translated)
     for id, translated_text in translated.items():
-        coords = coordinates[id]
-        # print(f"{id}: {translated_text}")
+        coords = coordinates[int(id)]
+        original_text = texts[int(id)]['text']
+        print(f"{id}: {original_text}")
+        print(translated_text)
+        print("==================================")
+
         #wipe the space
         draw.rectangle(coords, fill="white", outline="white")
 
@@ -207,24 +216,6 @@ def runOCRTests():
             print(f"failed on {i}")
             break
 
-###
-### testing
-###
-
-from transformers import MarianMTModel, MarianTokenizer
-model_name = "Helsinki-NLP/opus-mt-ko-en"
-kr_tokenizer = MarianTokenizer.from_pretrained(model_name)
-kr_model = MarianMTModel.from_pretrained(model_name)
-
-def kr_translate(text):
-    text = [text]
-    inputs = kr_tokenizer(text, return_tensors="pt", padding=True)
-    outputs = kr_model.generate(**inputs, max_new_tokens=200)
-
-    return (kr_tokenizer.batch_decode(outputs, skip_special_tokens=True))
-###
-###
-###
 def main():
     img_path = ROOT / "test_images" / "test_7.png"
     img = process_image(img_path, "japanese")
