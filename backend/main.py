@@ -217,7 +217,7 @@ def runOCRTests():
             break
 
 def main():
-    img_path = ROOT / "test_images" / "test_7.png"
+    img_path = ROOT / "test_images" / "test_2.png"
     img = process_image(img_path, "japanese")
     img.show()
 
