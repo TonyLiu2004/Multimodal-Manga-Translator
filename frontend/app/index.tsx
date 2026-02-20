@@ -1,4 +1,4 @@
-import { Text, ScrollView, View, StyleSheet, ActivityIndicator, TextInput, Image } from "react-native";
+import { useWindowDimensions, Text, ScrollView, View, StyleSheet, ActivityIndicator, TextInput, Image } from "react-native";
 import React, { useEffect, useState } from 'react';
 
 const BASE_URL = "https://api.mangadex.org";
@@ -6,6 +6,10 @@ const BASE_URL = "https://api.mangadex.org";
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState('');
   const [mangaList, setMangaList] = useState<any[]>([]);
+
+  const { width } = useWindowDimensions();
+  const isDesktop = width > 600;
+
 
   const handleSearch = async () => {
     console.log("Searching for:", searchQuery);
@@ -19,22 +23,6 @@ export default function Index() {
       console.error("Search error:", error);
     }
   };
-
-  const getCoverImageUrl = async (manga: any) => {
-    const coverArt = manga.relationships.find((rel: any) => rel.type === 'cover_art');
-    const mangaUrl = manga.attributes.title
-    if (coverArt) {
-      try {
-        const response = await fetch(`${BASE_URL}/cover/${coverArt.id}`);
-        const json = await response.json();
-        const fileName = json.data.attributes.fileName;
-        return `${BASE_URL}/covers/${manga.id}/${fileName}`;
-      } catch (error) {
-        console.error("Error fetching cover image:", error);
-      }
-    }
-  };
-
 
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: 'center', padding: 20, justifyContent: 'center' }}>
@@ -65,7 +53,7 @@ export default function Index() {
                 <View key={manga.id} style={{ 
                   marginBottom: 10, 
                   justifyContent: 'flex-start',
-                  flexDirection: 'row',
+                  flexDirection: isDesktop ? 'row' : 'column',
                   width: '50%',
                 }}>
                   <Image 
