@@ -18,4 +18,3 @@ class Bubble_Detector_Kitsumed_Service:
             imgsz=imgsz,
         )
         return results[0]
-    
