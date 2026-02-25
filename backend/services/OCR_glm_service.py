@@ -5,7 +5,7 @@ from helpers import get_project_root
 
 
 class OCR_Glm_Service:
-    def __init__(self, ocr_path=None, device= None):
+    def __init__(self, ocr_path=None, device=None):
         if not ocr_path:
             ROOT = get_project_root()
             ocr_path = ROOT / "backend" / "models" / "GlmOcr"

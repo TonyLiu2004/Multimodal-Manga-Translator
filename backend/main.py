@@ -8,35 +8,57 @@ from PIL import Image, ImageDraw, ImageFont
 import tempfile
 import os
 import re
+import torch
 from pathlib import Path
 from helpers import get_project_root, setup_fonts
+from fastapi import FastAPI
 
-from manga_ocr import MangaOcr
-mocr = MangaOcr()
 ###
 ###
 ###
 
 ROOT = get_project_root()
 
-GLMOCR_MODEL_DIR = ROOT / "backend" / "models" / "GlmOcr"
+#Path base and fallbacks
+MODEL_PATH = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
+
+#Font path
+env_font = os.getenv("FONT_PATH")
+if env_font:
+    FONT_PATH = Path(env_font)
+else:
+    FONT_PATH = ROOT / "backend" / "fonts" / "NotoSansCJK.ttc"
+
+# Device defaults to 'cpu' if not specified
+env_device = os.getenv("DEVICE", "cpu").lower()
+if env_device in ["amd", "cuda"]:
+    device_name = "cuda" if torch.cuda.is_available() else "cpu"
+else:
+    device_name = "cpu"
+
+device = torch.device(device_name)
+
+print(f"Loading models from {MODEL_PATH} and fonts from {FONT_PATH}")
+
+app = FastAPI()
+
+#####################
+
+GLMOCR_MODEL_DIR = MODEL_PATH / "GlmOcr"
 ocr_model = OCR_Glm_Service(GLMOCR_MODEL_DIR)
 
-JAPANESE_OCR_MODEL_DIR = ROOT / "backend" / "models" / "Kha-white"
+JAPANESE_OCR_MODEL_DIR = MODEL_PATH / "Kha-white"
 ocr_japanese_model = OCR_Japanese_Service(JAPANESE_OCR_MODEL_DIR)
 
-CN_TRANSLATE_MODEL_DIR = ROOT / "backend" / "models" / "TencentHY"
+CN_TRANSLATE_MODEL_DIR = MODEL_PATH / "TencentHY"
 cn_translate_model = Translate_Tencent_Service(CN_TRANSLATE_MODEL_DIR)
 
-TRANSLATE_MODEL_DIR = ROOT / "backend" / "models" / "Qwen"
+TRANSLATE_MODEL_DIR = MODEL_PATH / "Qwen"
 translate_model = Translate_Qwen_Service(TRANSLATE_MODEL_DIR)
 
-BUBBLE_DETECTOR_MODLE_DIR = ROOT / "backend" / "models"
+BUBBLE_DETECTOR_MODLE_DIR = MODEL_PATH
 bubble_detector_model = Bubble_Detector_Kiuyha_Service(BUBBLE_DETECTOR_MODLE_DIR)
 
-
-
-FONT_PATH = ROOT / "backend" / "fonts" / "NotoSansCJK.ttc"
 if not FONT_PATH.exists():
     print(f"Font NotoSansCJK not found at {FONT_PATH}. Attempting to download.")
     setup_fonts()
@@ -221,5 +243,15 @@ def main():
     img = process_image(img_path, "japanese")
     img.show()
 
+@app.get("/")
+def home():
+    return {"status": "Manga Translator Backend Running"}
+
+@app.post("/translate")
+def translate_manga (data: dict):
+    print(data)
+    return {"result": "translated text"}
+
 if __name__ == "__main__":
-    main()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

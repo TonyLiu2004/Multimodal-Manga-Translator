@@ -1,3 +1,4 @@
+#not currently in use
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from PIL import Image
 import torch
@@ -6,7 +7,7 @@ from pathlib import Path
 
 
 class Translate_Tencent_Service:
-    def __init__(self, ocr_path=None, device= None):
+    def __init__(self, ocr_path=None, device=None):
         tokenizer_path = ocr_path / "tokenizer"
         model_path = ocr_path / "model"
 

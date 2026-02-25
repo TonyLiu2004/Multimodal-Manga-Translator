@@ -1,0 +1,9 @@
+# Folders
+/prototypes/
+**/venv/
+.git/
+
+# Files
+.env
+**/*.pyc
+**/__pycache__/

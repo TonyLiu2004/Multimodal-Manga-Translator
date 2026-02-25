@@ -1,11 +1,10 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import json
-import re
-import ast
+import torch
 from helpers import get_project_root
 
 class Translate_Qwen_Service:
-    def __init__(self, path=None):
+    def __init__(self, path=None, device=None):
         if not path:
             ROOT = get_project_root()
             path = ROOT / "backend" / "models" / "Qwen"
@@ -20,6 +19,7 @@ class Translate_Qwen_Service:
         if tokenizer_path.exists() and model_path.exists():
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
             self.model = AutoModelForCausalLM.from_pretrained(model_path, tie_word_embeddings=False)
+            self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
             print("Loaded Qwen Translate")
         else:
             raise FileNotFoundError(f"Error: Could not find or retrieve {model_path}")
@@ -62,7 +62,7 @@ class Translate_Qwen_Service:
             tokenize=True,
             return_dict=True,
             return_tensors="pt",
-        ).to(self.model.device)
+        ).to(self.device)
 
         outputs = self.model.generate(**inputs, max_new_tokens=400)
         output_text = self.tokenizer.decode(outputs[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)
