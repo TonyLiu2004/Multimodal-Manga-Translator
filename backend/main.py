@@ -1,6 +1,7 @@
 from services.OCR_glm_service import OCR_Glm_Service
 from services.translate_tencentHY_service import Translate_Tencent_Service
 from services.bubble_detector_kitsumed_service import Bubble_Detector_Kitsumed_Service
+
 from services.bubble_detector_kiuyha_service import Bubble_Detector_Kiuyha_Service
 from services.OCR_japanese_service import OCR_Japanese_Service
 from services.translate_qwen_service import Translate_Qwen_Service
@@ -12,6 +13,7 @@ import torch
 from pathlib import Path
 from helpers import get_project_root, setup_fonts
 from fastapi import FastAPI
+import db as manga_db
 
 ###
 ###
@@ -84,18 +86,18 @@ def show_boxes(image_path):
         # Get coordinates as a list of floats
         coords = box.xyxy[0].tolist() # [x1, y1, x2, y2]
         draw.rectangle(coords, outline="red", width=1)
-        
+
         # label
         conf = box.conf[0].item()
         box_cropped = img.crop(coords)
         # box_cropped = upscale_for_ocr(box_cropped, scale=3)
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
-            box_cropped.save(f.name)      
+            box_cropped.save(f.name)
             temp_path = f.name
         draw.text(
-            (coords[0], coords[1] - 10), 
-            "b",  
-            fill="red", 
+            (coords[0], coords[1] - 10),
+            "b",
+            fill="red",
             font=font
         )
     img.show()
@@ -114,34 +116,34 @@ def get_wrapped_text(text, font, max_width):
         else:
             lines.append(' '.join(current_line))
             current_line = [word]
-    
+
     lines.append(' '.join(current_line))
     return lines
 
 def fit_text_to_box(draw, text, box_coords, font_path, padding=5, initial_size=40):
     x1, y1, x2, y2 = box_coords
-    
+
     padding = padding
     target_width = (x2 - x1) - (padding * 2)
     target_height = (y2 - y1) - (padding * 2)
-    
+
     current_size = initial_size
     lines = []
-    
+
     while current_size > 8:
         # index=0 for Japanese, 1 for Korean in NotoSansCJK
         font = ImageFont.truetype(font_path, size=current_size)
         lines = get_wrapped_text(text, font, target_width)
-        
+
         # Use a more reliable line height measurement
         # getbbox can be inconsistent; use font.size * constant for better leading
-        line_height = int(current_size * 1.2) 
+        line_height = int(current_size * 1.2)
         total_height = line_height * len(lines)
-        
+
         if total_height <= target_height:
             break
         current_size -= 2 # Step down by 2 for speed
-        
+
     return lines, font, current_size, line_height
 
 def upscale_for_ocr(img, scale=2):
@@ -152,7 +154,7 @@ def process_image(image_path, language):
     bubble_results = bubble_detector_model.predict(image_path)
     img = Image.open(image_path)
     draw = ImageDraw.Draw(img)
-    
+
     texts = []
     coordinates={}
     i=0
@@ -164,7 +166,7 @@ def process_image(image_path, language):
         # box_cropped.show()
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
-            box_cropped.save(f.name)      
+            box_cropped.save(f.name)
             temp_path = f.name
 
         text = ""
@@ -184,12 +186,25 @@ def process_image(image_path, language):
     print("translating...")
     translated = translate_model.translate(texts)
     print(translated)
-    for id, translated_text in translated.items():
-        coords = coordinates[int(id)]
-        original_text = texts[int(id)]['text']
-        print(f"{id}: {original_text}")
+
+    bubble_data = []
+    for i in range(len(texts)):
+        coords = coordinates[i]
+        x1, y1, x2, y2 = coords
+        original_text = texts[i]["text"]
+        translated_text = translated.get(str(i), translated.get(i, ""))
+        if not isinstance(translated_text, str):
+            translated_text = str(translated_text)
+        print(f"{i}: {original_text}")
         print(translated_text)
         print("==================================")
+
+        bubble_data.append({
+            "bubble_index": i,
+            "x1": float(x1), "y1": float(y1), "x2": float(x2), "y2": float(y2),
+            "original_text": original_text,
+            "translated_text": translated_text,
+        })
 
         #wipe the space
         draw.rectangle(coords, fill="white", outline="white")
@@ -207,23 +222,23 @@ def process_image(image_path, language):
         for line in lines:
             line = line.strip()
             if not line: continue
-            
+
             # Horizontal Centering
             line_w = draw.textlength(line, font=best_font)
             start_x = coords[0] + ((coords[2] - coords[0]) - line_w) / 2
-            
+
             draw.text((start_x, start_y), line, font=best_font, fill="black")
             start_y += line_h
 
-    return img
+    return img, bubble_data
 
 def translate_text(text, language):
     # translated_text = ""
     # if language == "japanese":
-    #     translated_text = 
+    #     translated_text =
 
     translated_text = translate_model.translate(text)
-          
+
     return translated_text
 
 def runOCRTests():
@@ -238,10 +253,60 @@ def runOCRTests():
             print(f"failed on {i}")
             break
 
+def _language_to_code(language: str) -> str:
+    """Map language name to ISO 639-1 style code for DB."""
+    m = {"japanese": "ja", "english": "en", "korean": "ko", "chinese": "zh"}
+    return m.get(language.lower(), language[:2] if len(language) >= 2 else "ja")
+
+
+def process_chapter(
+    manga_title: str,
+    chapter_number: float,
+    page_paths: list,
+    language: str = "japanese",
+    provider_id: str = "local",
+    db_url: str = None,
+):
+    """
+    Process each page of a chapter, draw translated text on images, and save
+    to the PostgreSQL text repository (provider_id, manga_title, chapter/page,
+    segment coordinates, original/translated text, language code). No images stored.
+    page_paths: list of paths to page images in order.
+    provider_id: source/provider identifier (e.g. 'mangadex', 'local').
+    db_url: PostgreSQL URL or set DATABASE_URL.
+    Returns (list of (img, bubble_data) per page).
+    """
+    manga_db.init_db(db_url)
+    language_code = _language_to_code(language)
+    results = []
+    for page_number, image_path in enumerate(page_paths, start=1):
+        path = Path(image_path)
+        if not path.exists():
+            print(f"Skip missing page {page_number}: {path}")
+            continue
+        print(f"Processing chapter {chapter_number} page {page_number}/{len(page_paths)}: {path.name}")
+        img, bubble_data = process_image(str(path), language)
+        manga_db.save_page_translation(
+            provider_id=provider_id,
+            manga_title=manga_title,
+            chapter_number=chapter_number,
+            page_number=page_number,
+            bubbles=bubble_data,
+            language_code=language_code,
+            db_url=db_url,
+        )
+        results.append((img, bubble_data))
+    print(f"Chapter '{manga_title}' ch.{chapter_number} saved to DB ({len(results)} pages).")
+    return results
+
+
 def main():
     img_path = ROOT / "test_images" / "test_2.png"
-    img = process_image(img_path, "japanese")
+    img, bubble_data = process_image(img_path, "japanese")
     img.show()
+    # manga_db.save_page_translation(provider_id="local", manga_title="Test", chapter_number=0,
+    #     page_number=1, bubbles=bubble_data, language_code="ja")
+
 
 @app.get("/")
 def home():
