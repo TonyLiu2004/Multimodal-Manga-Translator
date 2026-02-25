@@ -6,6 +6,7 @@ The system leverages a FastAPI backend to perform automated bubble-text detectio
 
 NOTES: 
 - First build will take a long time because the base image is large.
+- Docker images use Python 3.10 for compatibility with AI libraries (PyTorch/ROCm) and hardware drivers.
 - Dockerfile.nvidia on the backend has not been tested
 
 ## Prerequisites
