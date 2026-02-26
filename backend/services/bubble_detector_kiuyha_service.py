@@ -20,7 +20,7 @@ class Bubble_Detector_Kiuyha_Service:
             self.load_model()
 
         if self.base_model_path.exists():
-            self.model = YOLO(self.base_model_path)
+            self.model = YOLO(self.base_model_path, task="detect") #'task=detect', 'segment', 'classify','pose' or 'obb'
             print("Loaded Bubble Detector Kiuyha")
         else:
             raise FileNotFoundError(f"Error: Could not find or retrieve {self.base_model_path}")

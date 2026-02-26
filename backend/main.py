@@ -27,7 +27,7 @@ MODEL_PATH = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
 #Font path
 env_font = os.getenv("FONT_PATH")
 if env_font:
-    FONT_PATH = Path(env_font)
+    FONT_PATH = Path(env_font) / "NotoSansCJK.ttc"
 else:
     FONT_PATH = ROOT / "backend" / "fonts" / "NotoSansCJK.ttc"
 

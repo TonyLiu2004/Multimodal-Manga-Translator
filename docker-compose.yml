@@ -10,7 +10,7 @@ services:
       - ./backend:/app
     environment:
       - MODEL_PATH=/app/models
-      - FONT_PATH=/app/fonts/NotoSansCJK.ttc
+      - FONT_PATH=/app/fonts
       - DEVICE=amd
       - YOLO_CONFIG_DIR=/tmp/Ultralytics
       - HSA_OVERRIDE_GFX_VERSION=10.3.0 # Make ROCm work on more AMD cards

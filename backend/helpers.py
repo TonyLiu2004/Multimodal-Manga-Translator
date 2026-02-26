@@ -16,7 +16,9 @@ ROOT = get_project_root()
 
 def setup_fonts():
     url = "https://github.com/googlefonts/noto-cjk/raw/main/Sans/SuperOTC/NotoSansCJK.ttc.zip"
-    extract_to = ROOT / "backend" / "fonts"
+    extract_to = Path(os.getenv("FONT_PATH", ROOT / "backend" / "fonts"))
+    extract_to.mkdir(parents=True, exist_ok=True)
+    
     if Path(extract_to / "NotoSansCJK.ttc").exists():
         print(f"Font file exists at {extract_to}")
         return

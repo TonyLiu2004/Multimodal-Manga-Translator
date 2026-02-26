@@ -50,6 +50,12 @@ docker compose up
 Once the logs show Uvicorn running, access the interactive API documentation at:
 http://localhost:8000/docs
 
+Server runs at:
+http://localhost:8000/
+
+Frontend runs at:
+http://localhost:8081/
+
 ---
 
 ## Troubleshooting & Maintenance
