@@ -52,14 +52,13 @@ ocr_model = OCR_Glm_Service(GLMOCR_MODEL_DIR)
 JAPANESE_OCR_MODEL_DIR = MODEL_PATH / "Kha-white"
 ocr_japanese_model = OCR_Japanese_Service(JAPANESE_OCR_MODEL_DIR)
 
-CN_TRANSLATE_MODEL_DIR = MODEL_PATH / "TencentHY"
-cn_translate_model = Translate_Tencent_Service(CN_TRANSLATE_MODEL_DIR)
-
-TRANSLATE_MODEL_DIR = MODEL_PATH / "Qwen"
-translate_model = Translate_Qwen_Service(TRANSLATE_MODEL_DIR)
-
 BUBBLE_DETECTOR_MODEL_DIR = MODEL_PATH / "kiuyha.pt"
 bubble_detector_model = Bubble_Detector_Kiuyha_Service(BUBBLE_DETECTOR_MODEL_DIR)
+
+cn_translate_model = Translate_Tencent_Service()
+
+translate_model = Translate_Qwen_Service()
+
 
 if not FONT_PATH.exists():
     print(f"Font NotoSansCJK not found at {FONT_PATH}. Attempting to download.")
@@ -73,6 +72,8 @@ if FONT_PATH.exists():
     )
 else:
     raise FileNotFoundError(f"Font NotoSansCJK not found at {FONT_PATH}")
+
+print("Finished loading all models and fonts")
 
 ###
 ###
@@ -183,8 +184,13 @@ def process_image(image_path, language):
     print(f'OCR Complete, total {len(texts)} bubbles.')
 
     #add translated text to manga image
-    print("translating...")
-    translated = translate_model.translate(texts)
+    try:
+        print("Translating with cloud Qwen model...")
+        translated = translate_model.translate_cloud(texts)
+    except Exception as e:
+        print("API translation failed with Qwen, falling back to local model...")
+        translated = translate_model.translate(texts)
+
     print(translated)
 
     bubble_data = []
