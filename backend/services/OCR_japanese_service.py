@@ -2,14 +2,19 @@ from transformers import AutoTokenizer, AutoImageProcessor, VisionEncoderDecoder
 from PIL import Image
 from pathlib import Path
 from helpers import get_project_root
+import os
 
 ROOT = get_project_root()
 
 class OCR_Japanese_Service:
     def __init__(self, ocr_path=None, device=None):
+        ROOT = get_project_root()
+        self.base_model_path = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
+
         if not ocr_path:
-            ROOT = get_project_root()
-            ocr_path = ROOT / "backend" / "models" / "Kha-white"
+            ocr_path = self.base_model_path / "Kha-white"
+        else:
+            ocr_path = Path(ocr_path)
 
         processor_path = ocr_path / "processor"
         model_path = ocr_path / "model"
@@ -43,13 +48,12 @@ class OCR_Japanese_Service:
         return generated_text
 
     def load_model(self):
-        ROOT = get_project_root()
-        MODEL_PATH = "kha-white/manga-ocr-base"
-        JAPANESE_OCR_DIR = ROOT / "backend" / "models" / "Kha-white"
+        DOWNLOAD_MODEL = "kha-white/manga-ocr-base"
+        JAPANESE_OCR_DIR = self.base_model_path / "Kha-white"
 
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-        model = VisionEncoderDecoderModel.from_pretrained(MODEL_PATH)
-        processor = AutoImageProcessor.from_pretrained(MODEL_PATH)
+        tokenizer = AutoTokenizer.from_pretrained(DOWNLOAD_MODEL)
+        model = VisionEncoderDecoderModel.from_pretrained(DOWNLOAD_MODEL)
+        processor = AutoImageProcessor.from_pretrained(DOWNLOAD_MODEL)
 
         tokenizer.save_pretrained(JAPANESE_OCR_DIR / "tokenizer")
         model.save_pretrained(JAPANESE_OCR_DIR / "model")

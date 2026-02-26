@@ -1,14 +1,16 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import json
 import torch
+import os
+from pathlib import Path
 from helpers import get_project_root
 
 class Translate_Qwen_Service:
     def __init__(self, path=None, device=None):
-        if not path:
-            ROOT = get_project_root()
-            path = ROOT / "backend" / "models" / "Qwen"
-
+        ROOT = get_project_root()
+        self.base_model_path = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
+        
+        path = self.base_model_path / "Qwen"
         tokenizer_path = path / "tokenizer"
         model_path = path / "model"
 
@@ -74,12 +76,11 @@ class Translate_Qwen_Service:
             return {"error": "Invalid JSON", "raw": output_text}
     
     def load_model(self):
-        ROOT = get_project_root()
-        MODEL_PATH = "Qwen/Qwen2.5-7B-Instruct"
-        QWEN_DIR = ROOT / "backend" / "models" / "Qwen"
+        QWEN_DIR = self.base_model_path / "Qwen"
+        DOWNLOAD_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-        model = AutoModelForCausalLM.from_pretrained(MODEL_PATH)
+        tokenizer = AutoTokenizer.from_pretrained(DOWNLOAD_MODEL)
+        model = AutoModelForCausalLM.from_pretrained(DOWNLOAD_MODEL)
         tokenizer.save_pretrained(QWEN_DIR / "tokenizer")
         model.save_pretrained(QWEN_DIR / "model")
 

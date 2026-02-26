@@ -1,14 +1,20 @@
 from transformers import AutoModelForImageTextToText, AutoProcessor
 import torch
+import os
 from pathlib import Path
 from helpers import get_project_root
 
 
 class OCR_Glm_Service:
     def __init__(self, ocr_path=None, device=None):
+        ROOT = get_project_root()
+        self.base_model_path = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
+            
         if not ocr_path:
-            ROOT = get_project_root()
-            ocr_path = ROOT / "backend" / "models" / "GlmOcr"
+            ocr_path = self.base_model_path / "GlmOcr"
+        else:
+            ocr_path = Path(ocr_path)
+
         processor_path = ocr_path / "processor"
         model_path = ocr_path / "model"
 
@@ -49,13 +55,12 @@ class OCR_Glm_Service:
         return output_text
     
     def load_model(self):
-        ROOT = get_project_root()
-        GLMOCR_MODEL_DIR = ROOT / "backend" / "models" / "GlmOcr"
-        MODEL_PATH = "zai-org/GLM-OCR"
+        GLMOCR_MODEL_DIR = self.base_model_path / "GlmOcr"
+        DOWNLOAD_MODEL = "zai-org/GLM-OCR"
 
-        model = AutoModelForImageTextToText.from_pretrained(MODEL_PATH)
+        model = AutoModelForImageTextToText.from_pretrained(DOWNLOAD_MODEL)
         model.save_pretrained(GLMOCR_MODEL_DIR / "model")
-        processor = AutoProcessor.from_pretrained( MODEL_PATH)
+        processor = AutoProcessor.from_pretrained( DOWNLOAD_MODEL)
         processor.save_pretrained(GLMOCR_MODEL_DIR / "processor")
 
         print(f"Downloaded GLM OCR to: {GLMOCR_MODEL_DIR}")

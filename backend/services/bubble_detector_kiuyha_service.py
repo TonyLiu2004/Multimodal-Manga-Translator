@@ -3,24 +3,27 @@ from PIL import Image
 from helpers import get_project_root
 from huggingface_hub import hf_hub_download
 from pathlib import Path
+import os
 
 class Bubble_Detector_Kiuyha_Service:
     def __init__(self, path=None):
-        if not path:
-            ROOT = get_project_root()
-            path =  ROOT / "backend" / "models"
-            
-        model_path = path / "kiuyha.pt"
+        ROOT = get_project_root()
+        self.base_model_path = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
 
-        if not model_path.exists():
-            print(f"Kiuyha model not found at {model_path}. Attempting to download")
+        if not path:
+            path = self.base_model_path / "GlmOcr"
+        else:
+            path = Path(path)
+            
+        if not self.base_model_path.exists():
+            print(f"Kiuyha model not found at {self.base_model_path}. Attempting to download")
             self.load_model()
 
-        if model_path.exists():
-            self.model = YOLO(model_path)
+        if self.base_model_path.exists():
+            self.model = YOLO(self.base_model_path)
             print("Loaded Bubble Detector Kiuyha")
         else:
-            raise FileNotFoundError(f"Error: Could not find or retrieve {model_path}")
+            raise FileNotFoundError(f"Error: Could not find or retrieve {self.base_model_path}")
           
     def predict(self, img_path, conf=0.2, iou=0.4, show_labels=True, show_conf=True, imgsz=640):
         results = self.model.predict(
@@ -62,9 +65,7 @@ class Bubble_Detector_Kiuyha_Service:
         return sorted_boxes
     
     def load_model(self):
-        ROOT = get_project_root()
-        model_dir = ROOT / "backend" / "models"
-        target_path = model_dir / "kiuyha.pt"
+        target_path = self.base_model_path / "kiuyha.pt"
 
         if target_path.exists():
             print(f"Kiuya Model already exists at {target_path}")
@@ -73,7 +74,7 @@ class Bubble_Detector_Kiuyha_Service:
         downloaded_path = hf_hub_download(
             repo_id="Kiuyha/Manga-Bubble-YOLO",
             filename="model.pt",
-            local_dir=model_dir
+            local_dir=self.base_model_path
         )
 
         final_path = Path(downloaded_path).rename(target_path)
