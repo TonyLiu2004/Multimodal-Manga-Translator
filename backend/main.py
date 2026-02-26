@@ -1,7 +1,6 @@
 from services.OCR_glm_service import OCR_Glm_Service
 from services.translate_tencentHY_service import Translate_Tencent_Service
 from services.bubble_detector_kitsumed_service import Bubble_Detector_Kitsumed_Service
-
 from services.bubble_detector_kiuyha_service import Bubble_Detector_Kiuyha_Service
 from services.OCR_japanese_service import OCR_Japanese_Service
 from services.translate_qwen_service import Translate_Qwen_Service
@@ -13,6 +12,7 @@ import torch
 from pathlib import Path
 from helpers import get_project_root, setup_fonts
 from fastapi import FastAPI
+from typing import Optional
 import db as manga_db
 
 ###
@@ -58,8 +58,8 @@ cn_translate_model = Translate_Tencent_Service(CN_TRANSLATE_MODEL_DIR)
 TRANSLATE_MODEL_DIR = MODEL_PATH / "Qwen"
 translate_model = Translate_Qwen_Service(TRANSLATE_MODEL_DIR)
 
-BUBBLE_DETECTOR_MODLE_DIR = MODEL_PATH
-bubble_detector_model = Bubble_Detector_Kiuyha_Service(BUBBLE_DETECTOR_MODLE_DIR)
+BUBBLE_DETECTOR_MODEL_DIR = MODEL_PATH / "kiuyha.pt"
+bubble_detector_model = Bubble_Detector_Kiuyha_Service(BUBBLE_DETECTOR_MODEL_DIR)
 
 if not FONT_PATH.exists():
     print(f"Font NotoSansCJK not found at {FONT_PATH}. Attempting to download.")
@@ -241,17 +241,8 @@ def translate_text(text, language):
 
     return translated_text
 
-def runOCRTests():
-    test_dir = ROOT / "test_images"
-    for i in range(1, 10):
-        try:
-            image_url = test_dir / f"test_{i}.png"
-            text = ocr_model.runOCR(image_url)
-            print(f"=============={i}==============")
-            print(text)
-        except:
-            print(f"failed on {i}")
-            break
+def runOCRTests(image_url):
+    text = ocr_model.runOCR(image_url)
 
 def _language_to_code(language: str) -> str:
     """Map language name to ISO 639-1 style code for DB."""
@@ -301,8 +292,9 @@ def process_chapter(
 
 
 def main():
-    img_path = ROOT / "test_images" / "test_2.png"
+    img_path = "./test_2.png"
     img, bubble_data = process_image(img_path, "japanese")
+    print(bubble_data)
     img.show()
     # manga_db.save_page_translation(provider_id="local", manga_title="Test", chapter_number=0,
     #     page_number=1, bubbles=bubble_data, language_code="ja")
@@ -316,6 +308,19 @@ def home():
 def translate_manga (data: dict):
     print(data)
     return {"result": "translated text"}
+
+@app.post("/")
+def test(img_path: Optional[str] = None):
+    if not img_path:
+        img_path = "./test_2.png"
+    img_path = Path(img_path)
+
+    if img_path.exists():
+        img, bubble_data = process_image(img_path, "japanese")
+        print(bubble_data)
+        return {"result": bubble_data}
+    else:
+        print(f"{img_path} does not exist")
 
 if __name__ == "__main__":
     import uvicorn

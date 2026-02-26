@@ -6,24 +6,24 @@ from pathlib import Path
 import os
 
 class Bubble_Detector_Kiuyha_Service:
-    def __init__(self, path=None):
+    def __init__(self, model_path=None):
         ROOT = get_project_root()
         self.base_model_path = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
 
-        if not path:
-            path = self.base_model_path / "GlmOcr"
+        if not model_path:
+            model_path = self.base_model_path / "kiuyha.pt"
         else:
-            path = Path(path)
+            model_path = Path(model_path)
             
         if not self.base_model_path.exists():
-            print(f"Kiuyha model not found at {self.base_model_path}. Attempting to download")
+            print(f"Kiuyha model not found at {model_path}. Attempting to download")
             self.load_model()
 
-        if self.base_model_path.exists():
-            self.model = YOLO(self.base_model_path, task="detect") #'task=detect', 'segment', 'classify','pose' or 'obb'
+        if model_path.exists():
+            self.model = YOLO(model_path, task="detect") #'task=detect', 'segment', 'classify','pose' or 'obb'
             print("Loaded Bubble Detector Kiuyha")
         else:
-            raise FileNotFoundError(f"Error: Could not find or retrieve {self.base_model_path}")
+            raise FileNotFoundError(f"Error: Could not find or retrieve {model_path}")
           
     def predict(self, img_path, conf=0.2, iou=0.4, show_labels=True, show_conf=True, imgsz=640):
         results = self.model.predict(
