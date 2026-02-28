@@ -15,7 +15,7 @@ class Bubble_Detector_Kiuyha_Service:
         else:
             model_path = Path(model_path)
             
-        if not self.base_model_path.exists():
+        if not model_path.exists():
             print(f"Kiuyha model not found at {model_path}. Attempting to download")
             self.load_model()
 
@@ -73,7 +73,7 @@ class Bubble_Detector_Kiuyha_Service:
         
         downloaded_path = hf_hub_download(
             repo_id="Kiuyha/Manga-Bubble-YOLO",
-            filename="model.pt",
+            filename="weights/yolo26n.pt", #"model.pt",
             local_dir=self.base_model_path
         )
 

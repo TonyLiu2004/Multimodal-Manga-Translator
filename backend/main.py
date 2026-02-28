@@ -329,5 +329,6 @@ def test(img_path: Optional[str] = None):
         print(f"{img_path} does not exist")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    main()
+    # import uvicorn
+    # uvicorn.run(app, host="0.0.0.0", port=8000)
