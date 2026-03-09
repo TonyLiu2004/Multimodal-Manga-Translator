@@ -1,0 +1,8 @@
+Generic single-database configuration for Alembic.
+
+Run from backend directory:
+  alembic revision --autogenerate -m "description"
+  alembic upgrade head
+  alembic stamp <revision>   # set DB to a revision without running migrations
+  alembic current           # show current revision
+  alembic downgrade -1
