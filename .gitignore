@@ -1,3 +1,7 @@
 /venv
 .env
 /backend/models/
+/backend/__pycache__/
+__pycache__/
+*.py[cod]
+*.pyo
