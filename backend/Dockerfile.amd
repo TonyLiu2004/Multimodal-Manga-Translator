@@ -1,0 +1,34 @@
+# 1. Use the official AMD ROCm base image (adjust version if needed)
+FROM rocm/dev-ubuntu-22.04:6.0
+
+# 2. Prevent prompts during installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# 3. Install Python and essential tools
+RUN apt-get update && apt-get install -y libgl1 libglib2.0-0
+
+WORKDIR /app
+
+# 4. Install ML libraries (ROCm version of Torch)
+COPY requirements.txt .
+
+# 5. ROCm libraries first
+RUN pip3 install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/rocm6.0 \
+    torch torchvision torchaudio
+
+# 5.5 Then install the rest of the requirements without dependencies to avoid conflicts
+RUN pip3 install --no-cache-dir \
+    --extra-index-url https://pypi.org/simple \
+    --no-deps \
+    -r requirements.txt
+
+COPY . .
+
+# 6. Expose the port your server will run on (e.g., 8000)
+EXPOSE 8000
+
+# 7. Start your server
+CMD ["python3", "main.py"]

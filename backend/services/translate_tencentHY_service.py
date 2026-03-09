@@ -1,21 +1,44 @@
+#not currently in use
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from PIL import Image
 import torch
 import os
 from pathlib import Path
+from helpers import get_project_root
 
 
 class Translate_Tencent_Service:
-    def __init__(self, ocr_path=None, device= None):
-        tokenizer_path = ocr_path / "tokenizer"
-        model_path = ocr_path / "model"
-
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
-        self.model = AutoModelForCausalLM.from_pretrained(model_path, tie_word_embeddings=False,)
+    def __init__(self, device=None):
+        self.tokenizer = None
+        self.model = None
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        print("Loaded Tencent Translate")
+
+        ROOT = get_project_root()
+        self.base_model_path = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
+        self.tencentHY_dir = self.base_model_path / "TencentHY"
+
+    def initialize_local_models(self):
+        "internal method to only load local models when needed"
+        if self.model is not None and self.tokenizer is not None:
+            return
+
+        tokenizer_path = self.tencentHY_dir / "tokenizer"
+        model_path = self.tencentHY_dir / "model"
+
+        if not tokenizer_path.exists() or not model_path.exists():
+            print(f"TencentHY tokenizer/model not found at {self.tencentHY_dir}. Attemping to download")
+            self.load_model()
+        
+        if tokenizer_path.exists and model_path.exists():
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+            self.model = AutoModelForCausalLM.from_pretrained(model_path, tie_word_embeddings=False,)
+            print("Loaded Tencent LLM Locally")
+        else:
+            raise FileNotFoundError(f"Error: Could not find or retrieve {model_path}")
     
     def translate(self, text):
+        if not self.model or not self.tokenizer:
+            self.initialize_local_models()
+        
         messages = [
             {"role": "system", "content": """
              You are a professional Manhua translator.  You will receive JSON-formatted Japanese OCR text from manga.
@@ -51,3 +74,14 @@ class Translate_Tencent_Service:
         output_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
         # print(output_text)
         return output_text
+
+    def load_model(self):
+        DOWNLOAD_MODEL = "tencent/HY-MT1.5-1.8B"
+
+        tokenizer = AutoTokenizer.from_pretrained(DOWNLOAD_MODEL)
+        model = AutoModelForCausalLM.from_pretrained(DOWNLOAD_MODEL, device_map="auto") 
+        tokenizer.save_pretrained(self.tencentHY_dir / "tokenizer")
+        model.save_pretrained(self.tencentHY_dir / "model")
+
+        print(f"Downloaded TencentHY LLM to: {self.tencentHY_dir}")
+        return str(self.tencentHY_dir)

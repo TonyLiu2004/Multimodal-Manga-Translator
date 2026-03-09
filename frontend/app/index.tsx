@@ -1,11 +1,23 @@
-import { useWindowDimensions, Text, ScrollView, View, StyleSheet, ActivityIndicator, TextInput, Image } from "react-native";
+import { useWindowDimensions, Text, ScrollView, View, StyleSheet, ActivityIndicator, TextInput, Image, Pressable } from "react-native";
 import React, { useEffect, useState } from 'react';
+import PopUp from './components/PopUp';
 
 const BASE_URL = "https://api.mangadex.org";
+
+interface Chapter {
+  id: string;
+  chapter: string;
+  title: string;
+  pages: number;
+}
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState('');
   const [mangaList, setMangaList] = useState<any[]>([]);
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [selectedManga, setSelectedManga] = useState<{ title: string; summary: string; coverUrl: string; mangaId: string }>({ title: '', summary: '', coverUrl: '', mangaId: '' });
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [loadingChapters, setLoadingChapters] = useState(false);
 
   const { width } = useWindowDimensions();
   const isDesktop = width > 600;
@@ -21,6 +33,29 @@ export default function Index() {
       console.log("Search results:", json.data);
     } catch (error) {
       console.error("Search error:", error);
+    }
+  };
+
+  const fetchChapters = async (mangaId: string) => {
+    setLoadingChapters(true);
+    try {
+      const response = await fetch(
+        `https://api.mangadex.org/manga/${mangaId}/feed?limit=20&order[chapter]=asc&translatedLanguage[]=en`
+      );
+      const json = await response.json();
+      const chapterData: Chapter[] = (json.data || []).map((ch: any) => ({
+        id: ch.id,
+        chapter: ch.attributes.chapter || '?',
+        title: ch.attributes.title || '',
+        pages: ch.attributes.pages || 0,
+      }));
+      setChapters(chapterData);
+      console.log(`Fetched ${chapterData.length} chapters`);
+    } catch (error) {
+      console.error("Error fetching chapters:", error);
+      setChapters([]);
+    } finally {
+      setLoadingChapters(false);
     }
   };
 
@@ -50,12 +85,25 @@ export default function Index() {
                 ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}.256.jpg`
                 : 'https://via.placeholder.com/256x360?text=No+Cover';
               return (
-                <View key={manga.id} style={{ 
-                  marginBottom: 10, 
-                  justifyContent: 'flex-start',
-                  flexDirection: isDesktop ? 'row' : 'column',
-                  width: '50%',
-                }}>
+                <Pressable 
+                  key={manga.id} 
+                  style={{ 
+                    marginBottom: 10, 
+                    justifyContent: 'flex-start',
+                    flexDirection: isDesktop ? 'row' : 'column',
+                    width: '50%',
+                  }}
+                  onPress={() => {
+                    setSelectedManga({
+                      title: displayTitle,
+                      summary: manga.attributes.description.en || "No description available.",
+                      coverUrl: coverUrl,
+                      mangaId: manga.id
+                    });
+                    setPopupVisible(true);
+                    fetchChapters(manga.id);
+                  }}
+                >
                   <Image 
                     source={{ uri: coverUrl }} 
                     style={{ width: 256, height: 360 }}
@@ -65,12 +113,22 @@ export default function Index() {
                     <Text style={{ color: 'gray' }}>ID: {manga.id}</Text>
                     <Text>{manga.attributes.description.en || "No description available."}</Text>
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           </View>
         </View>
       )}
+
+      <PopUp 
+        visible={popupVisible}
+        title={selectedManga.title}
+        summary={selectedManga.summary}
+        coverArt={selectedManga.coverUrl}
+        chapters={chapters}
+        loadingChapters={loadingChapters}
+        onClose={() => setPopupVisible(false)}
+      />
 
     </ScrollView>
   );

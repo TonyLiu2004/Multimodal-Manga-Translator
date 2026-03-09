@@ -1,0 +1,35 @@
+services:
+  manga-backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile.amd
+    container_name: manga-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - MODEL_PATH=/app/models
+      - FONT_PATH=/app/fonts
+      - HF_TOKEN=${HF_TOKEN}
+      - DEVICE=amd
+      - YOLO_CONFIG_DIR=/tmp/Ultralytics
+      - HSA_OVERRIDE_GFX_VERSION=10.3.0 # Make ROCm work on more AMD cards
+    shm_size: '8gb' #change size depending on your system
+
+  manga-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: manga-frontend
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Prevents local node_modules from overwriting container ones
+    environment:
+      - EXPO_PACKAGER_HOSTNAME=localhost
+      - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+      - REACT_APP_API_URL=http://localhost:8000 # For browser-side requests, change to your PC's ip if testing on physical phone
+    depends_on:
+      - manga-backend

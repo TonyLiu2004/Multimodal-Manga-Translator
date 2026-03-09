@@ -1,7 +1,6 @@
 from services.OCR_glm_service import OCR_Glm_Service
 from services.translate_tencentHY_service import Translate_Tencent_Service
 from services.bubble_detector_kitsumed_service import Bubble_Detector_Kitsumed_Service
-
 from services.bubble_detector_kiuyha_service import Bubble_Detector_Kiuyha_Service
 from services.OCR_japanese_service import OCR_Japanese_Service
 from services.translate_qwen_service import Translate_Qwen_Service
@@ -9,36 +8,58 @@ from PIL import Image, ImageDraw, ImageFont
 import tempfile
 import os
 import re
+import torch
 from pathlib import Path
 from helpers import get_project_root, setup_fonts
+from fastapi import FastAPI
+from typing import Optional
 import db as manga_db
 
-from manga_ocr import MangaOcr
-mocr = MangaOcr()
 ###
 ###
 ###
 
 ROOT = get_project_root()
 
-GLMOCR_MODEL_DIR = ROOT / "backend" / "models" / "GlmOcr"
+#Path base and fallbacks
+MODEL_PATH = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
+
+#Font path
+env_font = os.getenv("FONT_PATH")
+if env_font:
+    FONT_PATH = Path(env_font) / "NotoSansCJK.ttc"
+else:
+    FONT_PATH = ROOT / "backend" / "fonts" / "NotoSansCJK.ttc"
+
+# Device defaults to 'cpu' if not specified
+env_device = os.getenv("DEVICE", "cpu").lower()
+if env_device in ["amd", "cuda"]:
+    device_name = "cuda" if torch.cuda.is_available() else "cpu"
+else:
+    device_name = "cpu"
+
+device = torch.device(device_name)
+
+print(f"Loading models from {MODEL_PATH} and fonts from {FONT_PATH}")
+
+app = FastAPI()
+
+#####################
+
+GLMOCR_MODEL_DIR = MODEL_PATH / "GlmOcr"
 ocr_model = OCR_Glm_Service(GLMOCR_MODEL_DIR)
 
-JAPANESE_OCR_MODEL_DIR = ROOT / "backend" / "models" / "Kha-white"
+JAPANESE_OCR_MODEL_DIR = MODEL_PATH / "Kha-white"
 ocr_japanese_model = OCR_Japanese_Service(JAPANESE_OCR_MODEL_DIR)
 
-CN_TRANSLATE_MODEL_DIR = ROOT / "backend" / "models" / "TencentHY"
-cn_translate_model = Translate_Tencent_Service(CN_TRANSLATE_MODEL_DIR)
+BUBBLE_DETECTOR_MODEL_DIR = MODEL_PATH / "kiuyha.pt"
+bubble_detector_model = Bubble_Detector_Kiuyha_Service(BUBBLE_DETECTOR_MODEL_DIR)
 
-TRANSLATE_MODEL_DIR = ROOT / "backend" / "models" / "Qwen"
-translate_model = Translate_Qwen_Service(TRANSLATE_MODEL_DIR)
+cn_translate_model = Translate_Tencent_Service()
 
-BUBBLE_DETECTOR_MODLE_DIR = ROOT / "backend" / "models"
-bubble_detector_model = Bubble_Detector_Kiuyha_Service(BUBBLE_DETECTOR_MODLE_DIR)
+translate_model = Translate_Qwen_Service()
 
 
-
-FONT_PATH = ROOT / "backend" / "fonts" / "NotoSansCJK.ttc"
 if not FONT_PATH.exists():
     print(f"Font NotoSansCJK not found at {FONT_PATH}. Attempting to download.")
     setup_fonts()
@@ -51,6 +72,8 @@ if FONT_PATH.exists():
     )
 else:
     raise FileNotFoundError(f"Font NotoSansCJK not found at {FONT_PATH}")
+
+print("Finished loading all models and fonts")
 
 ###
 ###
@@ -161,8 +184,13 @@ def process_image(image_path, language):
     print(f'OCR Complete, total {len(texts)} bubbles.')
 
     #add translated text to manga image
-    print("translating...")
-    translated = translate_model.translate(texts)
+    try:
+        print("Translating with cloud Qwen model...")
+        translated = translate_model.translate_cloud(texts)
+    except Exception as e:
+        print("API translation failed with Qwen, falling back to local model...")
+        translated = translate_model.translate(texts)
+
     print(translated)
 
     bubble_data = []
@@ -219,17 +247,8 @@ def translate_text(text, language):
 
     return translated_text
 
-def runOCRTests():
-    test_dir = ROOT / "test_images"
-    for i in range(1, 10):
-        try:
-            image_url = test_dir / f"test_{i}.png"
-            text = ocr_model.runOCR(image_url)
-            print(f"=============={i}==============")
-            print(text)
-        except:
-            print(f"failed on {i}")
-            break
+def runOCRTests(image_url):
+    text = ocr_model.runOCR(image_url)
 
 def _language_to_code(language: str) -> str:
     """Map language name to ISO 639-1 style code for DB."""
@@ -279,11 +298,37 @@ def process_chapter(
 
 
 def main():
-    img_path = ROOT / "test_images" / "test_2.png"
+    img_path = "./test_2.png"
     img, bubble_data = process_image(img_path, "japanese")
+    print(bubble_data)
     img.show()
     # manga_db.save_page_translation(provider_id="local", manga_title="Test", chapter_number=0,
     #     page_number=1, bubbles=bubble_data, language_code="ja")
 
+
+@app.get("/")
+def home():
+    return {"status": "Manga Translator Backend Running"}
+
+@app.post("/translate")
+def translate_manga (data: dict):
+    print(data)
+    return {"result": "translated text"}
+
+@app.post("/")
+def test(img_path: Optional[str] = None):
+    if not img_path:
+        img_path = "./test_2.png"
+    img_path = Path(img_path)
+
+    if img_path.exists():
+        img, bubble_data = process_image(img_path, "japanese")
+        print(bubble_data)
+        return {"result": bubble_data}
+    else:
+        print(f"{img_path} does not exist")
+
 if __name__ == "__main__":
     main()
+    # import uvicorn
+    # uvicorn.run(app, host="0.0.0.0", port=8000)
