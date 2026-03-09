@@ -1,17 +1,36 @@
+<<<<<<< HEAD
 import { useWindowDimensions, Text, ScrollView, View, StyleSheet, ActivityIndicator, TextInput, Image, Modal, TouchableOpacity, Button, Linking } from "react-native";
+=======
+import { useWindowDimensions, Text, ScrollView, View, StyleSheet, ActivityIndicator, TextInput, Image, Pressable } from "react-native";
+>>>>>>> e9c1cd27a5f7cca18a5e550559e01a725ab5c6fd
 import React, { useEffect, useState } from 'react';
+import PopUp from './components/PopUp';
 
 const BASE_URL = "https://api.mangadex.org";
+
+interface Chapter {
+  id: string;
+  chapter: string;
+  title: string;
+  pages: number;
+}
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState('');
   const [mangaList, setMangaList] = useState<any[]>([]);
+<<<<<<< HEAD
   const [selectedManga, setSelectedManga] = useState<any | null>(null);
   const [chapters, setChapters] = useState<any[]>([]);
   const [loadingChapters, setLoadingChapters] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   // const [chapLang, setChapLang] = useState('en');
   const [totalChapters, setTotalChapters] = useState<number | null>(null);
+=======
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [selectedManga, setSelectedManga] = useState<{ title: string; summary: string; coverUrl: string; mangaId: string }>({ title: '', summary: '', coverUrl: '', mangaId: '' });
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [loadingChapters, setLoadingChapters] = useState(false);
+>>>>>>> e9c1cd27a5f7cca18a5e550559e01a725ab5c6fd
 
   const { width } = useWindowDimensions();
   const isDesktop = width > 600;
@@ -30,6 +49,7 @@ export default function Index() {
     }
   };
 
+<<<<<<< HEAD
   const fetchChapters = async (mangaId: string, lang = '') => {
     setLoadingChapters(true);
     try {
@@ -46,17 +66,40 @@ export default function Index() {
       console.error('Failed to fetch chapters', error);
       setChapters([]);
       setTotalChapters(null);
+=======
+  const fetchChapters = async (mangaId: string) => {
+    setLoadingChapters(true);
+    try {
+      const response = await fetch(
+        `https://api.mangadex.org/manga/${mangaId}/feed?limit=20&order[chapter]=asc&translatedLanguage[]=en`
+      );
+      const json = await response.json();
+      const chapterData: Chapter[] = (json.data || []).map((ch: any) => ({
+        id: ch.id,
+        chapter: ch.attributes.chapter || '?',
+        title: ch.attributes.title || '',
+        pages: ch.attributes.pages || 0,
+      }));
+      setChapters(chapterData);
+      console.log(`Fetched ${chapterData.length} chapters`);
+    } catch (error) {
+      console.error("Error fetching chapters:", error);
+      setChapters([]);
+>>>>>>> e9c1cd27a5f7cca18a5e550559e01a725ab5c6fd
     } finally {
       setLoadingChapters(false);
     }
   };
 
+<<<<<<< HEAD
   const handleOpenManga = async (manga: any) => {
     setSelectedManga(manga);
     setModalVisible(true);
     await fetchChapters(manga.id, '');
   };
 
+=======
+>>>>>>> e9c1cd27a5f7cca18a5e550559e01a725ab5c6fd
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: 'center', padding: 20, justifyContent: 'center' }}>
       <Text style={styles.h1}>Testing</Text>
@@ -83,12 +126,19 @@ export default function Index() {
                 ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}.256.jpg`
                 : 'https://via.placeholder.com/256x360?text=No+Cover';
               return (
+<<<<<<< HEAD
                 <TouchableOpacity key={manga.id} onPress={() => handleOpenManga(manga)} activeOpacity={0.8} style={
                   {
+=======
+                <Pressable 
+                  key={manga.id} 
+                  style={{ 
+>>>>>>> e9c1cd27a5f7cca18a5e550559e01a725ab5c6fd
                     marginBottom: 10, 
                     justifyContent: 'flex-start',
                     flexDirection: isDesktop ? 'row' : 'column',
                     width: '50%',
+<<<<<<< HEAD
                   }}>
                     <Image 
                       source={{ uri: coverUrl }} 
@@ -100,12 +150,37 @@ export default function Index() {
                       <Text>{manga.attributes.description?.en || "No description available."}</Text>
                     </View>
                 </TouchableOpacity>
+=======
+                  }}
+                  onPress={() => {
+                    setSelectedManga({
+                      title: displayTitle,
+                      summary: manga.attributes.description.en || "No description available.",
+                      coverUrl: coverUrl,
+                      mangaId: manga.id
+                    });
+                    setPopupVisible(true);
+                    fetchChapters(manga.id);
+                  }}
+                >
+                  <Image 
+                    source={{ uri: coverUrl }} 
+                    style={{ width: 256, height: 360 }}
+                  />
+                  <View style={{ flex: 1, marginLeft: 30 }}>
+                    <Text style={{ fontWeight: 'bold' }}>{displayTitle}</Text>
+                    <Text style={{ color: 'gray' }}>ID: {manga.id}</Text>
+                    <Text>{manga.attributes.description.en || "No description available."}</Text>
+                  </View>
+                </Pressable>
+>>>>>>> e9c1cd27a5f7cca18a5e550559e01a725ab5c6fd
               );
             })}
           </View>
         </View>
       )}
 
+<<<<<<< HEAD
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={modalStyles.container}>
           <View style={modalStyles.header}>
@@ -148,6 +223,17 @@ export default function Index() {
           )}
         </View>
       </Modal>
+=======
+      <PopUp 
+        visible={popupVisible}
+        title={selectedManga.title}
+        summary={selectedManga.summary}
+        coverArt={selectedManga.coverUrl}
+        chapters={chapters}
+        loadingChapters={loadingChapters}
+        onClose={() => setPopupVisible(false)}
+      />
+>>>>>>> e9c1cd27a5f7cca18a5e550559e01a725ab5c6fd
 
     </ScrollView>
   );
