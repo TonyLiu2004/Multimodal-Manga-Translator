@@ -8,8 +8,7 @@ import db
 
 
 def clear_seed_data():
-    """Remove the manga chapters inserted by seed_data.py."""
-    # Match the data from seed_data.py
+    """Remove the manga chapters inserted by create_data.py."""
     to_delete = [
         (db.PROVIDER_LOCAL, "One Piece", 1.0),
         (db.PROVIDER_LOCAL, "One Piece", 2.0),
@@ -23,11 +22,17 @@ def clear_seed_data():
 
 def clear_all():
     """Delete all chapters, then all manga."""
-    entries = db.list_entries()
-    for e in entries:
-        db.delete_chapter_segments(e["provider_id"], e["manga_title"], e["chapter_number"])
-        print(f"Deleted {e['provider_id']} | {e['manga_title']} ch.{e['chapter_number']}")
-    print(f"Cleared {len(entries)} chapter(s).")
+    mangas = db.list_mangas()
+    deleted = 0
+    for m in mangas:
+        provider_id = m["provider_id"]
+        manga_title = m["manga_title"]
+        chapters = db.list_chapters(manga_title, provider_id=provider_id)
+        for ch in chapters:
+            db.delete_chapter_segments(provider_id, manga_title, ch["chapter_number"])
+            print(f"Deleted {provider_id} | {manga_title} ch.{ch['chapter_number']}")
+            deleted += 1
+    print(f"Cleared {deleted} chapter(s).")
     db.delete_all_manga()
     print("Cleared all manga.")
 

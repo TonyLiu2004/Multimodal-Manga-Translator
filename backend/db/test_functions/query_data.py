@@ -8,27 +8,32 @@ import db
 
 
 def run():
-    print("=== list_entries (default: newest first) ===\n")
-    entries = db.list_entries()
-    for e in entries:
-        print(f"  {e['provider_id']} | {e['manga_title']} ch.{e['chapter_number']} | {e['last_updated']}")
-    print(f"\n  Total: {len(entries)} chapter(s)\n")
+    print("=== list_mangas (default: newest first) ===\n")
+    mangas = db.list_mangas()
+    for m in mangas:
+        print(f"  {m['provider_id']} | {m['manga_title']}")
+    print(f"\n  Total: {len(mangas)} manga(s)\n")
 
-    print("=== list_entries (order_by manga_title, asc) ===\n")
-    entries_by_title = db.list_entries(order_by="manga_title", order_desc=False)
-    for e in entries_by_title:
-        print(f"  {e['provider_id']} | {e['manga_title']} ch.{e['chapter_number']}")
-    print()
-
-    if not entries:
-        print("No data. Run:  python -m db.seed_data")
+    if not mangas:
+        print("No data. Run:  python -m db.test_functions.create_data")
         return
 
-    # Use first entry for get_segments / get_chapter_segments examples
-    first = entries[0]
-    provider_id = first["provider_id"]
-    manga_title = first["manga_title"]
-    chapter_number = first["chapter_number"]
+    first_manga = mangas[0]
+    provider_id = first_manga["provider_id"]
+    manga_title = first_manga["manga_title"]
+
+    chapters = db.list_chapters(manga_title, provider_id=provider_id)
+    if not chapters:
+        print(f"No chapters for {manga_title}. Run create_data to add pages.")
+        return
+    chapter_number = chapters[0]["chapter_number"]
+
+    print(f"=== list_chapters({manga_title!r}, provider_id={provider_id!r}) ===\n")
+    for c in chapters[:5]:
+        print(f"  ch.{c['chapter_number']} (id={c['id']})")
+    if len(chapters) > 5:
+        print(f"  ... and {len(chapters) - 5} more chapter(s)")
+    print(f"\n  Total: {len(chapters)} chapter(s)\n")
 
     print(f"=== get_chapter_segments({provider_id!r}, {manga_title!r}, {chapter_number}) ===\n")
     segments = db.get_chapter_segments(provider_id, manga_title, chapter_number)

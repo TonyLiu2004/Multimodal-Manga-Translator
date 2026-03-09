@@ -60,9 +60,17 @@ def seed():
         language_code="en",
     )
     print("Seed data inserted.")
-    entries = db.list_entries()
-    for e in entries:
-        print(f"  {e['provider_id']} | {e['manga_title']} ch.{e['chapter_number']} | {e['last_updated']}")
+    mangas = db.list_mangas(order_by="updated_at", order_desc=True)
+    print("\n=== list_mangas ===")
+    for m in mangas:
+        print(f"  {m['provider_id']} | {m['manga_title']}")
+
+    print("\n=== list_chapters (first manga) ===")
+    if mangas:
+        first = mangas[0]
+        chapters = db.list_chapters(first["manga_title"], provider_id=first["provider_id"])
+        for c in chapters:
+            print(f"  {c['provider_id']} | {c['manga_title']} ch.{c['chapter_number']} | {c['updated_at']}")
 
 
 if __name__ == "__main__":
