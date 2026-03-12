@@ -1,6 +1,8 @@
-import { useWindowDimensions, Text, ScrollView, View, StyleSheet, ActivityIndicator, TextInput, Image, Pressable } from "react-native";
-import React, { useEffect, useState } from 'react';
+import { useWindowDimensions, Text, ScrollView, View, StyleSheet, ActivityIndicator, TextInput, Image, Pressable, FlatList, NativeSyntheticEvent, NativeScrollEvent } from "react-native";
+import React, { useEffect, useState, useRef } from 'react';
 import PopUp from './components/PopUp';
+import Carousel, { ICarouselInstance, Pagination } from 'react-native-reanimated-carousel'
+import { useSharedValue } from "react-native-reanimated";
 
 const BASE_URL = "https://api.mangadex.org";
 
@@ -14,6 +16,7 @@ interface Chapter {
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState('');
   const [mangaList, setMangaList] = useState<any[]>([]);
+  const [popularManga, setPopularManga] = useState<any[]>([]);
   const [popupVisible, setPopupVisible] = useState(false);
   const [selectedManga, setSelectedManga] = useState<{ title: string; summary: string; coverUrl: string; mangaId: string }>({ title: '', summary: '', coverUrl: '', mangaId: '' });
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -21,18 +24,66 @@ export default function Index() {
 
   const { width } = useWindowDimensions();
   const isDesktop = width > 600;
+  const ref = useRef<ICarouselInstance>(null);
+  const progress = useSharedValue<number>(0);
 
+  useEffect(() => {
+    fetchPopularManga();
+  }, []);
+
+  const onPressPagination = (index: number) => {
+    ref.current?.scrollTo({
+      count: index - progress.value,
+      animated: true,
+    });
+  };
 
   const handleSearch = async () => {
     console.log("Searching for:", searchQuery);
     if (!searchQuery) return;
     try {
-      const response = await fetch(`https://api.mangadex.org/manga?title=${searchQuery}&limit=10&includes[]=cover_art`);
+      const response = await fetch(`https://api.mangadex.org/manga?title=${searchQuery}&limit=10&includes[]=cover_art`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const json = await response.json();
       setMangaList(json.data || []);
       console.log("Search results:", json.data);
     } catch (error) {
       console.error("Search error:", error);
+      setMangaList([]);
+    }
+  };
+
+  const fetchPopularManga = async() => {
+    try {
+      console.log("Fetching popular manga...");
+      const response = await fetch(`https://api.mangadex.org/manga?limit=15&order[followedCount]=desc&includes[]=cover_art`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log("Response status:", response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Fetched popular manga data:", data.data?.length, "items");
+      setPopularManga(data.data || []);
+    } catch (error) {
+      console.error("Can't retrieve popular manga:", error);
+      setPopularManga([]);
     }
   };
 
@@ -60,7 +111,7 @@ export default function Index() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: 'center', padding: 20, justifyContent: 'center' }}>
+    <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: 'center', padding: 20 }}>
       <Text style={styles.h1}>Manglify</Text>
       <TextInput
         style={styles.input}
@@ -68,6 +119,76 @@ export default function Index() {
         onSubmitEditing={handleSearch}
         value={searchQuery}
         placeholder="Search manga title"
+      />
+
+      <Carousel
+        ref={ref}
+        data={popularManga}
+        width={300}
+        height={420}
+        autoPlay={true}
+        autoPlayInterval={3000}
+        loop={true}
+        mode="parallax"
+        modeConfig={{
+          parallaxScrollingScale: 0.85,
+          parallaxScrollingOffset: 60,
+        }}
+        style={{ width: width - 600, marginTop: 30, paddingHorizontal: (width - 900) / 2}}
+        onProgressChange={(offsetProgress, absoluteProgress) => {
+					progress.value = absoluteProgress;
+				}}
+        renderItem={({ item: manga }) => {
+          const titles = Object.values(manga.attributes.title);
+          const displayTitle = titles[0] as string || "Untitled";
+
+          // get cover art url
+          const coverArt = manga.relationships.find((rel: any) => rel.type === 'cover_art');
+          const fileName = coverArt?.attributes?.fileName;
+          const coverUrl = fileName 
+            ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}.256.jpg`
+            : 'https://via.placeholder.com/256x360?text=No+Cover';
+          return (
+            <View
+              style={{ 
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Pressable 
+                key={manga.id} 
+                style={{ 
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={() => {
+                  setSelectedManga({
+                    title: displayTitle,
+                    summary: manga.attributes.description.en || "No description available.",
+                    coverUrl: coverUrl,
+                    mangaId: manga.id
+                  });
+                  setPopupVisible(true);
+                  fetchChapters(manga.id);
+                }}
+              >
+                <Image 
+                  source={{ uri: coverUrl }} 
+                  style={{ width: 296, height: 420, borderRadius: 10 }}
+                />
+              </Pressable>
+            </View>
+          );
+        }}
+      />
+
+      <Pagination.Basic
+        progress={progress}
+        data={popularManga}
+        dotStyle={{backgroundColor: "black", borderRadius: 50}}
+        containerStyle={{gap: 5, marginTop: 10, alignItems: 'center'}}
+        onPress={onPressPagination}
       />
       
       {mangaList.length > 0 && (
