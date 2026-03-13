@@ -2,7 +2,7 @@ services:
   manga-backend:
     build: 
       context: ./backend
-      dockerfile: Dockerfile.amd
+      dockerfile: Dockerfile.cpu
     container_name: manga-backend
     ports:
       - "8000:8000"
@@ -12,9 +12,9 @@ services:
       - MODEL_PATH=/app/models
       - FONT_PATH=/app/fonts
       - HF_TOKEN=${HF_TOKEN}
-      - DEVICE=amd
+      - DEVICE=cpu
       - YOLO_CONFIG_DIR=/tmp/Ultralytics
-      - HSA_OVERRIDE_GFX_VERSION=10.3.0 # Make ROCm work on more AMD cards
+      # - HSA_OVERRIDE_GFX_VERSION=10.3.0 # Make ROCm work on more AMD cards
     shm_size: '8gb' #change size depending on your system
 
   manga-frontend:

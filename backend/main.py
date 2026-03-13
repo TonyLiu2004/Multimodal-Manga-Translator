@@ -305,16 +305,6 @@ def main():
     # manga_db.save_page_translation(provider_id="local", manga_title="Test", chapter_number=0,
     #     page_number=1, bubbles=bubble_data, language_code="ja")
 
-
-@app.get("/")
-def home():
-    return {"status": "Manga Translator Backend Running"}
-
-@app.post("/translate")
-def translate_manga (data: dict):
-    print(data)
-    return {"result": "translated text"}
-
 @app.post("/")
 def test(img_path: Optional[str] = None):
     if not img_path:
@@ -329,6 +319,6 @@ def test(img_path: Optional[str] = None):
         print(f"{img_path} does not exist")
 
 if __name__ == "__main__":
-    main()
-    # import uvicorn
-    # uvicorn.run(app, host="0.0.0.0", port=8000)
+    # main()
+    import uvicorn
+    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True) #uses api.py

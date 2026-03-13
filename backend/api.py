@@ -6,6 +6,8 @@ Run from backend:  uvicorn api:app --reload --host 0.0.0.0 --port 8000
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import proxy
+from services import mangadex_service
 
 import db
 
@@ -116,3 +118,14 @@ def value_error_handler(request, exc):
     """Return 400 for invalid provider_id etc."""
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
+###########
+###########
+###########
+
+@app.get("/proxy/chapter/{chapter_id}/page/{page_index}")
+async def proxy_manga_page(chapter_id: str, page_index: int):
+    urls = mangadex_service.get_chapter_panel_urls(chapter_id)
+    if not urls or page_index >= len(urls):
+        return {"error": "Page not found"}, 404
+        
+    return await proxy.get_manga_page_stream(urls[page_index])
