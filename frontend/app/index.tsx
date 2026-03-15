@@ -2,7 +2,7 @@ import { useWindowDimensions, Text, ScrollView, View, StyleSheet, ActivityIndica
 import React, { useEffect, useState, useRef } from 'react';
 import PopUp from './components/PopUp';
 import Carousel, { ICarouselInstance, Pagination } from 'react-native-reanimated-carousel'
-import { useSharedValue } from "react-native-reanimated";
+import { useSharedValue, Extrapolation, interpolate } from "react-native-reanimated";
 
 const BASE_URL = "https://api.mangadex.org";
 
@@ -17,6 +17,9 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState('');
   const [mangaList, setMangaList] = useState<any[]>([]);
   const [popularManga, setPopularManga] = useState<any[]>([]);
+  const [actionManga, setActionManga] = useState<any[]>([]);
+  const [romanceManga, setRomanceManga] = useState<any[]>([]);
+  const [recentManga, setRecentManga] = useState<any[]>([]);
   const [popupVisible, setPopupVisible] = useState(false);
   const [selectedManga, setSelectedManga] = useState<{ title: string; summary: string; coverUrl: string; mangaId: string }>({ title: '', summary: '', coverUrl: '', mangaId: '' });
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -28,14 +31,44 @@ export default function Index() {
   const progress = useSharedValue<number>(0);
 
   useEffect(() => {
-    fetchPopularManga();
+    async function loadHomePage() {
+      const [
+        popular,
+        action,
+        romance,
+        recent
+      ] = await Promise.all([
+        fetchManga("limit=15&order[followedCount]=desc"),
+        fetchManga("limit=10&includedTags[]=391b0423-d847-456f-aff0-8b0cfc03066b&order[followedCount]=desc"),
+        fetchManga("limit=10&includedTags[]=423e2eae-a7a2-4a8b-ac03-a8351462d71d&order[followedCount]=desc"),
+        fetchManga("limit=10&order[latestUploadedChapter]=desc")
+      ]);
+
+      setPopularManga(popular);
+      setActionManga(action);
+      setRomanceManga(romance);
+      setRecentManga(recent);
+    }
+
+    loadHomePage();
   }, []);
 
-  const onPressPagination = (index: number) => {
-    ref.current?.scrollTo({
-      count: index - progress.value,
-      animated: true,
-    });
+  const fetchManga = async (params: string) => {
+    try {
+      const response = await fetch(
+        `https://api.mangadex.org/manga?${params}&includes[]=cover_art`
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.data || [];
+    } catch (error) {
+      console.error("Error fetching manga:", error);
+      return [];
+    }
   };
 
   const handleSearch = async () => {
@@ -62,31 +95,6 @@ export default function Index() {
     }
   };
 
-  const fetchPopularManga = async() => {
-    try {
-      console.log("Fetching popular manga...");
-      const response = await fetch(`https://api.mangadex.org/manga?limit=15&order[followedCount]=desc&includes[]=cover_art`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      console.log("Response status:", response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log("Fetched popular manga data:", data.data?.length, "items");
-      setPopularManga(data.data || []);
-    } catch (error) {
-      console.error("Can't retrieve popular manga:", error);
-      setPopularManga([]);
-    }
-  };
-
   const fetchChapters = async (mangaId: string) => {
     setLoadingChapters(true);
     try {
@@ -110,6 +118,59 @@ export default function Index() {
     }
   };
 
+  const renderMangaCard = (manga: any, width: number, height: number) => {
+    const titles = Object.values(manga.attributes.title);
+    const displayTitle = titles[0] as string || "Untitled";
+
+    // get cover art url
+    const coverArt = manga.relationships.find((rel: any) => rel.type === 'cover_art');
+    const fileName = coverArt?.attributes?.fileName;
+    const coverUrl = fileName 
+      ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}.256.jpg`
+      : 'https://via.placeholder.com/256x360?text=No+Cover';
+    
+    return (
+      <View
+        style={{ 
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginHorizontal: 12
+        }}
+      >
+        <Pressable 
+          key={manga.id} 
+          style={{ 
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onPress={() => {
+            setSelectedManga({
+              title: displayTitle,
+              summary: manga.attributes.description.en || "No description available.",
+              coverUrl: coverUrl,
+              mangaId: manga.id
+            });
+            setPopupVisible(true);
+            fetchChapters(manga.id);
+          }}
+        >
+          <Image 
+            source={{ uri: coverUrl }} 
+            style={{ width: width, height: height, borderRadius: 10 }}
+          />
+        </Pressable>
+      </View>
+    );
+  };
+
+  const onPressPagination = (index: number) => {
+    ref.current?.scrollTo({
+      count: index - progress.value,
+      animated: true,
+    });
+  };
+  
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: 'center', padding: 20 }}>
       <Text style={styles.h1}>Manglify</Text>
@@ -138,59 +199,83 @@ export default function Index() {
         onProgressChange={(offsetProgress, absoluteProgress) => {
 					progress.value = absoluteProgress;
 				}}
-        renderItem={({ item: manga }) => {
-          const titles = Object.values(manga.attributes.title);
-          const displayTitle = titles[0] as string || "Untitled";
-
-          // get cover art url
-          const coverArt = manga.relationships.find((rel: any) => rel.type === 'cover_art');
-          const fileName = coverArt?.attributes?.fileName;
-          const coverUrl = fileName 
-            ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}.256.jpg`
-            : 'https://via.placeholder.com/256x360?text=No+Cover';
-          return (
-            <View
-              style={{ 
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Pressable 
-                key={manga.id} 
-                style={{ 
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onPress={() => {
-                  setSelectedManga({
-                    title: displayTitle,
-                    summary: manga.attributes.description.en || "No description available.",
-                    coverUrl: coverUrl,
-                    mangaId: manga.id
-                  });
-                  setPopupVisible(true);
-                  fetchChapters(manga.id);
-                }}
-              >
-                <Image 
-                  source={{ uri: coverUrl }} 
-                  style={{ width: 296, height: 420, borderRadius: 10 }}
-                />
-              </Pressable>
-            </View>
-          );
-        }}
+        renderItem={({ item: manga }) => renderMangaCard(manga, 300, 450)}
       />
 
-      <Pagination.Basic
-        progress={progress}
-        data={popularManga}
-        dotStyle={{backgroundColor: "black", borderRadius: 50}}
-        containerStyle={{gap: 5, marginTop: 10, alignItems: 'center'}}
-        onPress={onPressPagination}
-      />
-      
+      <Pagination.Custom<{ color: string }>
+				progress={progress}
+				data={popularManga}
+				size={10}
+				dotStyle={{
+					borderRadius: 16,
+					backgroundColor: "#262626",
+				}}
+				activeDotStyle={{
+					borderRadius: 8,
+					width: 25,
+					height: 15,
+					overflow: "hidden",
+					backgroundColor: "#b8b8b8",
+				}}
+				containerStyle={{
+					gap: 8,
+					marginBottom: 10,
+					alignItems: "center",
+					height: 10,
+				}}
+				horizontal
+				onPress={onPressPagination}
+				customReanimatedStyle={(progress, index, length) => {
+					let val = Math.abs(progress - index);
+					if (index === 0 && progress > length - 1) {
+						val = Math.abs(progress - length);
+					}
+ 
+					return {
+						transform: [
+							{
+								translateY: interpolate(
+									val,
+									[0, 1],
+									[0, 0],
+									Extrapolation.CLAMP,
+								),
+							},
+						],
+					};
+				}}
+			/>
+
+      <View style={{marginTop: 30}}>
+        <Text style={styles.category_header}>Recently Updated</Text>
+        <FlatList
+          horizontal={true}
+          data={recentManga}
+          style={styles.category_list}
+          renderItem={({ item: manga }) => renderMangaCard(manga, 200, 300)}
+        />
+      </View>
+
+      <View style={{marginTop: 30}}>
+        <Text style={styles.category_header}>Action</Text>
+        <FlatList
+          horizontal={true}
+          data={actionManga}
+          style={styles.category_list}
+          renderItem={({ item: manga }) => renderMangaCard(manga, 200, 300)}
+        />
+      </View>
+
+      <View style={{marginTop: 30}}>
+        <Text style={styles.category_header}>Romance</Text>
+        <FlatList
+          horizontal={true}
+          data={romanceManga}
+          style={styles.category_list}
+          renderItem={({ item: manga }) => renderMangaCard(manga, 200, 300)}
+        />
+      </View>
+
       {mangaList.length > 0 && (
         <View style={{ marginTop: 20, alignItems: 'center' }}>
           <Text>{mangaList.length} manga found!</Text>
@@ -273,4 +358,12 @@ const styles = StyleSheet.create({
     color: '#333',          // Color of the text YOU type
     backgroundColor: '#FAFAFA',
   },
+  category_header: {
+    fontSize: 21,
+    marginBottom: 10
+  },
+  category_list: {
+    marginLeft: -12,
+    marginBottom: 25
+  }
 });
