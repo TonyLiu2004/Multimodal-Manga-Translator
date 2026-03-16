@@ -74,7 +74,7 @@ ngrok http 8000
 Take the url provided by ngrok and paste it into the BACKEND_URL variable in frontend/app/index.tsx
 
 ### Deployment and redeployment
-Run:
+In frontend folder run:
 ```
 npx expo export --platform web # builds frontend website and puts it in the dist folder
 

@@ -5,7 +5,7 @@ import Carousel, { ICarouselInstance, Pagination } from 'react-native-reanimated
 import { useSharedValue } from "react-native-reanimated";
 
 const BASE_URL = "https://api.mangadex.org";
-const BACKEND_URL = 'https://9895-2600-1017-a410-6e3e-8562-f8d-b602-91ea.ngrok-free.app';
+const BACKEND_URL = 'https://3ee7-2600-1017-a410-6e3e-8562-f8d-b602-91ea.ngrok-free.app';
 
 interface Chapter {
   id: string;
