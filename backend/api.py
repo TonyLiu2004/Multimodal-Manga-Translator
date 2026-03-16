@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import proxy
 from services import mangadex_service
-
+import httpx
 import db
 
 app = FastAPI(
@@ -122,10 +122,55 @@ def value_error_handler(request, exc):
 ###########
 ###########
 
-@app.get("/proxy/chapter/{chapter_id}/page/{page_index}")
+
+
+@app.get("/api/manga/chapter/{chapter_id}/page/{page_index}")
 async def proxy_manga_page(chapter_id: str, page_index: int):
     urls = mangadex_service.get_chapter_panel_urls(chapter_id)
     if not urls or page_index >= len(urls):
         return {"error": "Page not found"}, 404
         
     return await proxy.get_manga_page_stream(urls[page_index])
+
+@app.get("/api/manga/search")
+async def get_popular_manga(
+    title: str = "",
+    limit: int = 15,
+    offset: int = 0,
+    order_by: str = "followedCount",
+    order_direction: str = "desc",
+    cover_art: bool = True
+):
+    results = await mangadex_service.search_manga(
+        title=title,
+        limit=limit,
+        offset=offset,
+        order_by=order_by,
+        order_direction=order_direction,
+        cover_art=cover_art
+    )
+    return results
+
+
+@app.get("/api/manga/{manga_id}/chapters")
+async def get_chapters(
+    manga_id: str, 
+    limit: int = 100,
+    translatedLanguage: list[str] = Query(['en']),
+    offset: int = 0,
+    order_by: str = "chapter", 
+    order_direction: str = "desc",
+    content_rating: list[str] = Query(["safe", "suggestive"]), #, "erotica", "pornographic"], #oh hell naw
+    includeEmptyPages: int = 0
+):
+    results = await mangadex_service.get_manga_chapters(
+        manga_id=manga_id,
+        limit=limit,
+        languages=translatedLanguage,
+        offset=offset,
+        order_by=order_by,
+        order_direction=order_direction,
+        content_rating=content_rating,
+        include_empty=includeEmptyPages
+    )
+    return results

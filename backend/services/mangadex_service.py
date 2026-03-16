@@ -1,10 +1,11 @@
 import requests
 import json
 from cachetools import cached, TTLCache
+import httpx
 
 BASE_URL = "https://api.mangadex.org"
 
-def search_manga(title: str, limit: int =20, offset: int = 0, order: dict = {"relevance": "desc"}):
+async def search_manga(title: str, limit: int =20, offset: int = 0, order_by: str = "followedCount", order_direction: str = "desc", cover_art: bool = True):
     """
     Todo: filters by tags (include, exclude)
     Mostly for testing at the moment
@@ -12,81 +13,74 @@ def search_manga(title: str, limit: int =20, offset: int = 0, order: dict = {"re
 
     search_url = f"{BASE_URL}/manga"
 
-    final_order_query = {}
-    for key, value in order.items():
-        final_order_query[f"order[{key}]"] = value
-
-    search_params = {
-        "title": title,
+    params = {
         "limit": limit,
         "offset": offset,
-        "includes[]": ["cover_art"],
-        **final_order_query
+        f"order[{order_by}]": order_direction,
     }
 
-    try:
-        response = requests.get(search_url, params=search_params)
-        response.raise_for_status()
-        data = response.json()
-        print(f"Fetched {len(data.get("data", []))} results from MangaDex")
-    except Exception as e:
-        print(f"Error fetching from MangaDex: {e}")
-        return []
-    
-    mangas = []
-    for manga in data.get("data", []):
-        id = manga['id']
-        title = manga["attributes"]['title'].get("en", "")
-        cover_art_url = None
-        if title == "":
-            title_values = list(manga["attributes"]["title"].values())
-            title = title_values[0]
+    if cover_art:
+        params["includes[]"] = ["cover_art"]
 
-        cover_art_json = None
-        for rel in manga.get("relationships", []):
-            if rel["type"] == "cover_art":
-                cover_art_json = rel
-                break
-        
-        if cover_art_json:
-            cover_art_filename = cover_art_json['attributes']['fileName']
-            cover_art_url = f"https://uploads.mangadex.org/covers/{id}/{cover_art_filename}.256.jpg"
-        
-        # print(id)
-        # print(title)
-        # print(cover_art_url)
-        mangas.append({
-            "id": id,
-            "title": title,
-            "cover_url": cover_art_url
-        })
-    return mangas
+    if title.strip():
+            params["title"] = title
 
-def get_chapters(manga_id: str, limit: int = 5):
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(search_url, params=params, timeout=10.0)
+            response.raise_for_status()
+            data = response.json()
+            return data
+        except httpx.HTTPStatusError as e:
+            return {"error": f"MangaDex API error: {e.response.status_code}", "details": e.response.text}
+        except Exception as e:
+            print(f"Error fetching from MangaDex: {e}")
+            return {"error": "Internal server error", "details": str(e)}
+    return {"error": "end of function"}
+
+
+async def get_manga_chapters(
+    manga_id: str, 
+    limit: int = 100,
+    languages: list[str] = None,
+    offset: int = 0,
+    order_by: str = "chapter", 
+    order_direction: str = "desc",
+    content_rating: list[str] = None,
+    include_empty: int = 0
+):
     """
     Get the chapters of a given manga id
     """
-    feed_url = f"{BASE_URL}/manga/{manga_id}/feed"
-    feed_params = {
-        "translatedLanguage[]": ["en"],
+    url = f"{BASE_URL}/manga/{manga_id}/feed"
+    params = {
+        "translatedLanguage[]": languages,
         "order[chapter]": "desc",
         "limit": limit,
-        "contentRating[]": ["safe", "suggestive"], #, "erotica", "pornographic"], #oh hell naw
-        "includeEmptyPages": 0 #if pages = 0 or theres an externalURL, it means the manga is not hosted on mangedex so we can't download the images.
+        "offset": offset,
+        "contentRating[]": content_rating,
+        "includeEmptyPages": include_empty,
+        f"order[{order_by}]": order_direction,
+        "includes[]": ["scanlation_group"]
     }
 
-    try:
-        response = requests.get(feed_url, params=feed_params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+    print(f"get_chapters called with params: {params}")
 
-        if "data" not in data:
-            return []
-        #if data is [], then the manga panels are probably hosted somewhere else and must be accessed through externalUrl. To see, put includeEmptyPages = 1
-        return data["data"]
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching Mangadex chapters for manga_id {manga_id}")
-        return []
+    url = f"https://api.mangadex.org/manga/{manga_id}/feed"
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                url, 
+                params=params, 
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            return  {"error": f"MangaDex API error: {e.response.status_code}", "details": e.response.text}
+        except Exception as e:
+            return {"error": "Internal server error", "details": str(e)}
 
 
 # Cache up to 100 panels, each for 300 seconds (5 minutes)
@@ -130,7 +124,7 @@ def get_chapter_panel_urls(chapter_id: str, img_quality: str = "dataSaver"):
 
 ### testing
 
-# mangas = search_manga("b", 1)
+# mangas = search_manga("", 15,  0, order={"followedCount": "desc"})
 # print(mangas)
 # first_manga_id = mangas[0]['id']
 # chapters = get_chapters(first_manga_id)

@@ -5,6 +5,7 @@ import Carousel, { ICarouselInstance, Pagination } from 'react-native-reanimated
 import { useSharedValue } from "react-native-reanimated";
 
 const BASE_URL = "https://api.mangadex.org";
+const BACKEND_URL = 'https://9895-2600-1017-a410-6e3e-8562-f8d-b602-91ea.ngrok-free.app';
 
 interface Chapter {
   id: string;
@@ -42,10 +43,10 @@ export default function Index() {
     console.log("Searching for:", searchQuery);
     if (!searchQuery) return;
     try {
-      const response = await fetch(`https://api.mangadex.org/manga?title=${searchQuery}&limit=10&includes[]=cover_art`, {
-        method: 'GET',
+      const response = await fetch(`${BACKEND_URL}/api/manga/search?title=${searchQuery}&limit=10&cover_art=true`, {
         headers: {
           'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
         },
       });
       
@@ -64,35 +65,62 @@ export default function Index() {
 
   const fetchPopularManga = async() => {
     try {
-      console.log("Fetching popular manga...");
-      const response = await fetch(`https://api.mangadex.org/manga?limit=15&order[followedCount]=desc&includes[]=cover_art`, {
-        method: 'GET',
+      const params = new URLSearchParams({
+        limit: "15",
+        order_by: 'followedCount',
+        order_direction: 'desc',
+        cover_art: 'True',
+      });
+      const response = await fetch(`${BACKEND_URL}/api/manga/search?${params}`, {
         headers: {
           'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
         },
       });
       
-      console.log("Response status:", response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log("Fetched popular manga data:", data.data?.length, "items");
-      setPopularManga(data.data || []);
+      const json = await response.json();
+      setPopularManga(json.data || []);
     } catch (error) {
-      console.error("Can't retrieve popular manga:", error);
+      console.error("Proxy fetch failed:", error);
       setPopularManga([]);
     }
+    // try {
+    //   console.log("Fetching popular manga...");
+    //   const response = await fetch(`https://api.mangadex.org/manga?limit=15&order[followedCount]=desc&includes[]=cover_art`, {
+    //     method: 'GET',
+    //     headers: {
+    //       'Content-Type': 'application/json',
+    //     },
+    //   });
+      
+    //   console.log("Response status:", response.status);
+      
+    //   if (!response.ok) {
+    //     throw new Error(`HTTP error! status: ${response.status}`);
+    //   }
+      
+    //   const data = await response.json();
+    //   console.log("Fetched popular manga data:", data.data?.length, "items");
+    //   setPopularManga(data.data || []);
+    // } catch (error) {
+    //   console.error("Can't retrieve popular manga:", error);
+    //   setPopularManga([]);
+    // }
   };
 
   const fetchChapters = async (mangaId: string) => {
     setLoadingChapters(true);
     try {
-      const response = await fetch(
-        `https://api.mangadex.org/manga/${mangaId}/feed?limit=20&order[chapter]=asc&translatedLanguage[]=en`
-      );
+      // const response = await fetch(
+      //   `https://api.mangadex.org/manga/${mangaId}/feed?limit=20&order[chapter]=asc&translatedLanguage[]=en`
+      // );
+
+      const response = await fetch(`${BACKEND_URL}/api/manga/${mangaId}/chapters?limit=100&order_by=chapter&order_direction=asc&translatedLanguage=en&translatedLanguage=jp`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+      });
       const json = await response.json();
       const chapterData: Chapter[] = (json.data || []).map((ch: any) => ({
         id: ch.id,
@@ -111,7 +139,7 @@ export default function Index() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: 'center', padding: 20 }}>
+    <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: 'center', padding: 20}}>
       <Text style={styles.h1}>Manglify</Text>
       <TextInput
         style={styles.input}
@@ -134,7 +162,8 @@ export default function Index() {
           parallaxScrollingScale: 0.85,
           parallaxScrollingOffset: 60,
         }}
-        style={{ width: width - 600, marginTop: 30, paddingHorizontal: (width - 900) / 2}}
+        // style={{ width: width - 600, marginTop: 30, paddingHorizontal: (width - 900) / 2}} // On android, the width is different so it collapses when -600.
+        style = {{ width: width*0.8, marginTop: 30 }} 
         onProgressChange={(offsetProgress, absoluteProgress) => {
 					progress.value = absoluteProgress;
 				}}

@@ -56,6 +56,32 @@ http://localhost:8000/
 Frontend runs at:
 http://localhost:8081/
 
+## Testing hosted frontend 
+Frontend is deployed at https://manglify-d6ebc.web.app/
+- Browsers block public websites from reaching local addresses, so we use ngrok to tunnel our backend
+
+
+In Terminal 1:
+```
+python main.py
+```
+
+In Terminal 2:
+```
+ngrok http 8000
+```
+
+Take the url provided by ngrok and paste it into the BACKEND_URL variable in frontend/app/index.tsx
+
+### Deployment and redeployment
+Run:
+```
+npx expo export --platform web # builds frontend website and puts it in the dist folder
+
+firebase deploy --only hosting # deploys from dist folder
+
+```
+
 ---
 
 ## Troubleshooting & Maintenance
