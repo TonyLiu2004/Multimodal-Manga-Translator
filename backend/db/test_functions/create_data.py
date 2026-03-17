@@ -5,6 +5,7 @@ Requires DATABASE_URL in backend/.env.
 """
 
 import db
+from db.const import PROVIDER_LOCAL, PROVIDER_MANGADEX
 
 
 def _bubbles(*pairs: tuple[str, str]) -> list[dict]:
@@ -27,7 +28,7 @@ def seed():
     db.init_db()
     # Manga 1: One Piece, local provider
     db.save_page_translation(
-        provider_id=db.PROVIDER_LOCAL,
+        provider_id=PROVIDER_LOCAL,
         manga_title="One Piece",
         chapter_number=1.0,
         page_number=1,
@@ -35,7 +36,7 @@ def seed():
         language_code="en",
     )
     db.save_page_translation(
-        provider_id=db.PROVIDER_LOCAL,
+        provider_id=PROVIDER_LOCAL,
         manga_title="One Piece",
         chapter_number=1.0,
         page_number=2,
@@ -52,7 +53,7 @@ def seed():
     )
     # Manga 2: Naruto, mangadex provider
     db.save_page_translation(
-        provider_id=db.PROVIDER_MANGADEX,
+        provider_id=PROVIDER_MANGADEX,
         manga_title="Naruto",
         chapter_number=1.0,
         page_number=1,
@@ -63,14 +64,14 @@ def seed():
     mangas = db.list_mangas(order_by="updated_at", order_desc=True)
     print("\n=== list_mangas ===")
     for m in mangas:
-        print(f"  {m['provider_id']} | {m['manga_title']}")
+        print(f"  {m.provider_id} | {m.manga_title}")
 
     print("\n=== list_chapters (first manga) ===")
     if mangas:
         first = mangas[0]
-        chapters = db.list_chapters(first["manga_title"], provider_id=first["provider_id"])
+        chapters = db.list_chapters(first.manga_title, provider_id=first.provider_id)
         for c in chapters:
-            print(f"  {c['provider_id']} | {c['manga_title']} ch.{c['chapter_number']} | {c['updated_at']}")
+            print(f"  {c.provider_id} | {c.manga_title} ch.{c.chapter_number} | {c.updated_at}")
 
 
 if __name__ == "__main__":

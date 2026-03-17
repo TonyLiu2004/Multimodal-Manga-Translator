@@ -25,12 +25,12 @@ def clear_all():
     mangas = db.list_mangas()
     deleted = 0
     for m in mangas:
-        provider_id = m["provider_id"]
-        manga_title = m["manga_title"]
+        provider_id = m.provider_id
+        manga_title = m.manga_title
         chapters = db.list_chapters(manga_title, provider_id=provider_id)
         for ch in chapters:
-            db.delete_chapter_segments(provider_id, manga_title, ch["chapter_number"])
-            print(f"Deleted {provider_id} | {manga_title} ch.{ch['chapter_number']}")
+            db.delete_chapter_segments(provider_id, manga_title, ch.chapter_number)
+            print(f"Deleted {provider_id} | {manga_title} ch.{ch.chapter_number}")
             deleted += 1
     print(f"Cleared {deleted} chapter(s).")
     db.delete_all_manga()

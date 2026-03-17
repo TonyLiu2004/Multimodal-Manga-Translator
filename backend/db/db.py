@@ -52,6 +52,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from .const import PROVIDER_IDS
 from .models import Manga, Chapters, Pages, Segments
+from .schemas import ChapterListOut, SegmentListOut
 
 
 def _validate_provider_id(provider_id: str) -> None:
@@ -257,7 +258,7 @@ def get_segments(
     limit: Optional[int] = None,
     offset: int = 0,
     db_url=None,
-) -> list[dict]:
+) -> list[SegmentListOut]:
     """Query segments; returns rows with provider_id, manga_title, chapter_number, page_number, segment_index, x1..y2, original_text, translated_text, language_code, created_at. Supports limit/offset for pagination."""
     if provider_id is not None:
         _validate_provider_id(provider_id)
@@ -296,10 +297,15 @@ def get_segments(
         if limit is not None and limit > 0:
             stmt = stmt.limit(limit)
         rows = session.exec(stmt).all()
-        # Convert to list of dicts with same keys as before
-        keys = ["id", "provider_id", "manga_title", "chapter_number", "page_number", "segment_index",
-                "x1", "y1", "x2", "y2", "original_text", "translated_text", "language_code", "created_at"]
-        return [dict(zip(keys, r)) for r in rows]
+        return [
+            SegmentListOut(
+                id=r[0], provider_id=r[1], manga_title=r[2], chapter_number=r[3],
+                page_number=r[4], segment_index=r[5], x1=r[6], y1=r[7], x2=r[8],
+                y2=r[9], original_text=r[10], translated_text=r[11], language_code=r[12],
+                created_at=r[13],
+            )
+            for r in rows
+        ]
 
 
 def get_chapter_segments(
@@ -309,7 +315,7 @@ def get_chapter_segments(
     limit: Optional[int] = None,
     offset: int = 0,
     db_url=None,
-) -> list[dict]:
+) -> list[SegmentListOut]:
     """Get all segments for a chapter. Supports limit/offset for pagination."""
     _validate_provider_id(provider_id)
     return get_segments(
@@ -327,7 +333,7 @@ def list_chapters(
     limit: Optional[int] = None,
     offset: int = 0,
     db_url=None,
-) -> list[dict]:
+) -> list[ChapterListOut]:
     """List chapters (id, chapter_number, created_at, updated_at). Filters by manga_title; optionally by provider_id."""
     engine = get_engine(db_url)
     with Session(engine) as session:
@@ -344,7 +350,13 @@ def list_chapters(
         if limit is not None and limit > 0:
             stmt = stmt.limit(limit)
         rows = session.exec(stmt).all()
-        return [{"manga_title": r[0], "provider_id": r[1], "id": r[2], "chapter_number": r[3], "created_at": r[4], "updated_at": r[5]} for r in rows]
+        return [
+            ChapterListOut(
+                manga_title=r[0], provider_id=r[1], id=r[2], chapter_number=r[3],
+                created_at=r[4], updated_at=r[5],
+            )
+            for r in rows
+        ]
 
 
 def list_mangas(
@@ -353,7 +365,7 @@ def list_mangas(
     order_desc: bool = True,
     limit: Optional[int] = None,
     offset: int = 0,
-) -> list[dict]:
+) -> list[Manga]:
     """
     List Manga (provider_id, manga_title, created_at, updated_at).
     order_by: one of "provider_id", "manga_title", "created_at", "updated_at"
@@ -371,13 +383,9 @@ def list_mangas(
     if order_desc:
         col = desc(col)
     with Session(engine) as session:
-        stmt = (
-            select(Manga.provider_id, Manga.manga_title, Manga.created_at, Manga.updated_at)
-            .select_from(Manga)
-        )
+        stmt = select(Manga).order_by(col)
         if offset > 0:
             stmt = stmt.offset(offset)
         if limit is not None and limit > 0:
             stmt = stmt.limit(limit)
-        rows = session.exec(stmt).all()
-        return [{"provider_id": r[0], "manga_title": r[1], "created_at": r[2], "updated_at": r[3]} for r in rows]
+        return list(session.exec(stmt).all())

@@ -53,11 +53,11 @@ class TestDb(unittest.TestCase):
         )
         rows = db.get_segments(provider_id=db.PROVIDER_LOCAL, manga_title=self.MANGA, chapter_number=self.CHAPTER, page_number=self.PAGE)
         self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0]["translated_text"], "Hello")
-        self.assertEqual(rows[0]["provider_id"], db.PROVIDER_LOCAL)
-        self.assertEqual(rows[0]["manga_title"], self.MANGA)
-        self.assertEqual(rows[0]["chapter_number"], self.CHAPTER)
-        self.assertEqual(rows[0]["page_number"], self.PAGE)
+        self.assertEqual(rows[0].translated_text, "Hello")
+        self.assertEqual(rows[0].provider_id, db.PROVIDER_LOCAL)
+        self.assertEqual(rows[0].manga_title, self.MANGA)
+        self.assertEqual(rows[0].chapter_number, self.CHAPTER)
+        self.assertEqual(rows[0].page_number, self.PAGE)
 
     def test_save_replaces_existing(self):
         """save_page_translation replaces existing segments for same page."""
@@ -79,7 +79,7 @@ class TestDb(unittest.TestCase):
         )
         rows = db.get_segments(provider_id=db.PROVIDER_LOCAL, manga_title=self.MANGA, chapter_number=self.CHAPTER, page_number=self.PAGE)
         self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0]["translated_text"], "Second")
+        self.assertEqual(rows[0].translated_text, "Second")
 
     def test_get_chapter_segments(self):
         """get_chapter_segments returns all segments for a chapter."""
@@ -113,12 +113,12 @@ class TestDb(unittest.TestCase):
             language_code=self.LANG,
         )
         entries = db.list_mangas()
-        found = [e for e in entries if e["manga_title"] == self.MANGA]
+        found = [e for e in entries if e.manga_title == self.MANGA]
         self.assertGreater(len(found), 0)
-        self.assertIn("provider_id", found[0])
-        self.assertIn("manga_title", found[0])
-        self.assertIn("created_at", found[0])
-        self.assertIn("updated_at", found[0])
+        self.assertTrue(hasattr(found[0], "provider_id"))
+        self.assertTrue(hasattr(found[0], "manga_title"))
+        self.assertTrue(hasattr(found[0], "created_at"))
+        self.assertTrue(hasattr(found[0], "updated_at"))
 
         entries_asc = db.list_mangas(order_by="created_at", order_desc=False)
         self.assertIsInstance(entries_asc, list)
@@ -150,16 +150,16 @@ class TestDb(unittest.TestCase):
             language_code=self.LANG,
         )
         chapters = db.list_chapters(self.MANGA)
-        found = [c for c in chapters if c["chapter_number"] == self.CHAPTER]
+        found = [c for c in chapters if c.chapter_number == self.CHAPTER]
         self.assertGreater(len(found), 0)
-        self.assertIn("manga_title", found[0])
-        self.assertIn("provider_id", found[0])
-        self.assertIn("id", found[0])
-        self.assertIn("chapter_number", found[0])
-        self.assertIn("created_at", found[0])
-        self.assertIn("updated_at", found[0])
-        self.assertEqual(found[0]["manga_title"], self.MANGA)
-        self.assertEqual(found[0]["provider_id"], db.PROVIDER_LOCAL)
+        self.assertTrue(hasattr(found[0], "manga_title"))
+        self.assertTrue(hasattr(found[0], "provider_id"))
+        self.assertTrue(hasattr(found[0], "id"))
+        self.assertTrue(hasattr(found[0], "chapter_number"))
+        self.assertTrue(hasattr(found[0], "created_at"))
+        self.assertTrue(hasattr(found[0], "updated_at"))
+        self.assertEqual(found[0].manga_title, self.MANGA)
+        self.assertEqual(found[0].provider_id, db.PROVIDER_LOCAL)
 
         chapters_with_provider = db.list_chapters(self.MANGA, provider_id=db.PROVIDER_LOCAL)
         self.assertGreater(len(chapters_with_provider), 0)
@@ -196,7 +196,7 @@ class TestDb(unittest.TestCase):
         self.assertEqual(len(limited), 1)
         offset_rows = db.get_segments(provider_id=db.PROVIDER_LOCAL, manga_title=self.MANGA, chapter_number=self.CHAPTER, limit=1, offset=1)
         self.assertEqual(len(offset_rows), 1)
-        self.assertEqual(offset_rows[0]["translated_text"], "A 2")
+        self.assertEqual(offset_rows[0].translated_text, "A 2")
 
     def test_delete_page_segments(self):
         """delete_page_segments removes page and its segments."""

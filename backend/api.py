@@ -10,6 +10,8 @@ import proxy
 from services import mangadex_service
 import httpx
 import db
+from db.models import Manga
+from db.schemas import ChapterListOut, SegmentListOut
 
 app = FastAPI(
     title="Manga Translator API",
@@ -37,7 +39,7 @@ def root():
     }
 
 
-@app.get("/mangas")
+@app.get("/mangas", response_model=list[Manga])
 def list_mangas(
     order_by: str = Query("created_at", description="provider_id | manga_title | created_at | updated_at"),
     order_desc: bool = Query(True, description="Sort descending"),
@@ -45,10 +47,9 @@ def list_mangas(
     offset: int = Query(0, ge=0, description="Skip N results"),
 ):
     """List mangas (provider_id, manga_title, created_at, updated_at). Supports pagination."""
-    entries = db.list_mangas(order_by=order_by, order_desc=order_desc, limit=limit, offset=offset)
-    return _serialize(entries)
+    return db.list_mangas(order_by=order_by, order_desc=order_desc, limit=limit, offset=offset)
 
-@app.get("/chapters")
+@app.get("/chapters", response_model=list[ChapterListOut])
 def list_chapters(
     manga_title: str = Query(...),
     provider_id: str | None = Query(None, description="e.g. local, mangadex"),
@@ -56,11 +57,10 @@ def list_chapters(
     offset: int = Query(0, ge=0, description="Skip N results"),
 ):
     """List chapters (id, chapter_number, created_at, updated_at). Filters by manga_title; optionally by provider_id."""
-    chapters = db.list_chapters(manga_title, provider_id, limit=limit, offset=offset)
-    return _serialize(chapters)
+    return db.list_chapters(manga_title, provider_id, limit=limit, offset=offset)
 
 
-@app.get("/segments")
+@app.get("/segments", response_model=list[SegmentListOut])
 def get_segments(
     provider_id: str | None = Query(None, description="e.g. local, mangadex"),
     manga_title: str | None = Query(None),
@@ -70,7 +70,7 @@ def get_segments(
     offset: int = Query(0, ge=0, description="Skip N results"),
 ):
     """Get segments with optional filters. Supports pagination."""
-    segments = db.get_segments(
+    return db.get_segments(
         provider_id=provider_id,
         manga_title=manga_title,
         chapter_number=chapter_number,
@@ -78,10 +78,9 @@ def get_segments(
         limit=limit,
         offset=offset,
     )
-    return _serialize(segments)
 
 
-@app.get("/chapters/segments")
+@app.get("/chapters/segments", response_model=list[SegmentListOut])
 def get_chapter_segments(
     provider_id: str = Query(..., description="e.g. local, mangadex"),
     manga_title: str = Query(...),
@@ -90,20 +89,7 @@ def get_chapter_segments(
     offset: int = Query(0, ge=0, description="Skip N results"),
 ):
     """Get all segments for one chapter. Supports pagination."""
-    segments = db.get_chapter_segments(provider_id, manga_title, chapter_number, limit=limit, offset=offset)
-    return _serialize(segments)
-
-
-def _serialize(entries: list[dict]) -> list[dict]:
-    """Convert datetime fields to ISO strings for JSON."""
-    result = []
-    for e in entries:
-        row = dict(e)
-        for key in ("last_updated", "created_at", "updated_at"):
-            if key in row and row[key] is not None:
-                row[key] = row[key].isoformat()
-        result.append(row)
-    return result
+    return db.get_chapter_segments(provider_id, manga_title, chapter_number, limit=limit, offset=offset)
 
 
 # to make sure api is running and responding
