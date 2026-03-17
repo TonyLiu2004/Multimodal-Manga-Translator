@@ -1,6 +1,8 @@
 services:
   manga-backend:
-    build: 
+    depends_on:
+      - db
+    build:
       context: ./backend
       dockerfile: Dockerfile.cpu
     container_name: manga-backend
@@ -33,3 +35,18 @@ services:
       - REACT_APP_API_URL=http://localhost:8000 # For browser-side requests, change to your PC's ip if testing on physical phone
     depends_on:
       - manga-backend
+  db:
+    image: postgres:16
+    container_name: mmt_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mmt_user
+      POSTGRES_PASSWORD: mmt_password
+      POSTGRES_DB: mmt_test
+    ports:
+      - "5432:5432"
+    volumes:
+      - mmt_db_data:/var/lib/postgresql/data
+
+volumes:
+  mmt_db_data:
