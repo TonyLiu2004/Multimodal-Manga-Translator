@@ -1,21 +1,55 @@
-name: Backend tests + DB query check
+name: Backend tests (isolated DB)
 
 on: [push, pull_request]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mmt_user
+          POSTGRES_PASSWORD: mmt_password
+          POSTGRES_DB: mmt_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U mmt_user -d mmt_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL: postgresql://mmt_user:mmt_password@localhost:5432/mmt_test
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: |
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
           cd backend
           pip install -r requirements.txt
-          # Verify Supabase DB is reachable and has data
-          python -m db.test_functions.query_data
-          # Run integration tests
+
+      - name: Seed test data
+        run: |
+          cd backend
+          python -m db.test_functions.create_data
+
+      - name: Run DB tests
+        run: |
+          cd backend
           python -m unittest db.test_db -v

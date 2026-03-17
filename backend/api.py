@@ -10,6 +10,7 @@ import proxy
 from services import mangadex_service
 import httpx
 import db
+from sqlmodel import Session, text
 from db.models import Manga
 from db.schemas import ChapterListOut, SegmentListOut
 
@@ -37,6 +38,16 @@ def root():
         "redoc": "/redoc",
         "health": "/health",
     }
+
+@app.get("/health/db")
+def health_db():
+    engine = db.get_engine()
+    try:
+        with Session(engine) as session:
+            session.exec(text("SELECT 1"))
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
 
 @app.get("/mangas", response_model=list[Manga])
@@ -115,7 +126,7 @@ async def proxy_manga_page(chapter_id: str, page_index: int):
     urls = mangadex_service.get_chapter_panel_urls(chapter_id)
     if not urls or page_index >= len(urls):
         return {"error": "Page not found"}, 404
-        
+
     return await proxy.get_manga_page_stream(urls[page_index])
 
 @app.get("/api/manga/search")
@@ -140,11 +151,11 @@ async def get_popular_manga(
 
 @app.get("/api/manga/{manga_id}/chapters")
 async def get_chapters(
-    manga_id: str, 
+    manga_id: str,
     limit: int = 100,
     translatedLanguage: list[str] = Query(['en']),
     offset: int = 0,
-    order_by: str = "chapter", 
+    order_by: str = "chapter",
     order_direction: str = "desc",
     content_rating: list[str] = Query(["safe", "suggestive"]), #, "erotica", "pornographic"], #oh hell naw
     includeEmptyPages: int = 0

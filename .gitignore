@@ -1,4 +1,6 @@
 /venv
+.venv
+backend/.venv
 .env
 /backend/models/
 /backend/__pycache__/
