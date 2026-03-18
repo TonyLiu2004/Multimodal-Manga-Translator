@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { Modal, Text, ScrollView, View, StyleSheet, Pressable, Image, ActivityIndicator } from "react-native";
 import React from 'react';
 
@@ -19,6 +20,9 @@ interface PopUpProps {
 }
 
 export default function PopUp({ visible, title, summary, coverArt, chapters, loadingChapters, onClose }: PopUpProps) {
+
+    const router = useRouter();
+
     return (
         <Modal
             visible={visible}
@@ -49,13 +53,16 @@ export default function PopUp({ visible, title, summary, coverArt, chapters, loa
                             ) : chapters.length > 0 ? (
                                 <View style={styles.chaptersList}>
                                     {chapters.map((chapter) => (
-                                        <View key={chapter.id} style={styles.chapterItem}>
+                                        <Pressable key={chapter.id} style={styles.chapterItem} onPress={() => {
+                                            onClose();
+                                            router.push(`/reader/${chapter.id}`);
+                                        }}>
                                             <Text style={styles.chapterNumber}>Ch. {chapter.chapter}</Text>
                                             <Text style={styles.chapterTitle}>
                                                 {chapter.title || 'No title'}
                                             </Text>
                                             <Text style={styles.chapterPages}>{chapter.pages} pages</Text>
-                                        </View>
+                                        </Pressable>
                                     ))}
                                 </View>
                             ) : (
