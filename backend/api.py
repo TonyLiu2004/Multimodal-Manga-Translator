@@ -52,12 +52,12 @@ def health_db():
 
 @app.get("/mangas", response_model=list[Manga])
 def list_mangas(
-    order_by: str = Query("created_at", description="provider_id | manga_title | created_at | updated_at"),
+    order_by: str = Query("created_at", description="manga_title | created_at | updated_at"),
     order_desc: bool = Query(True, description="Sort descending"),
     limit: int | None = Query(None, ge=1, le=500, description="Max results (default: all)"),
     offset: int = Query(0, ge=0, description="Skip N results"),
 ):
-    """List mangas (provider_id, manga_title, created_at, updated_at). Supports pagination."""
+    """List mangas (manga_title, created_at, updated_at). Supports pagination."""
     return db.list_mangas(order_by=order_by, order_desc=order_desc, limit=limit, offset=offset)
 
 @app.get("/chapters", response_model=list[ChapterListOut])

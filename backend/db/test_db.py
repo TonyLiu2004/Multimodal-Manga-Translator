@@ -115,7 +115,7 @@ class TestDb(unittest.TestCase):
         entries = db.list_mangas()
         found = [e for e in entries if e.manga_title == self.MANGA]
         self.assertGreater(len(found), 0)
-        self.assertTrue(hasattr(found[0], "provider_id"))
+        self.assertTrue(hasattr(found[0], "id"))
         self.assertTrue(hasattr(found[0], "manga_title"))
         self.assertTrue(hasattr(found[0], "created_at"))
         self.assertTrue(hasattr(found[0], "updated_at"))

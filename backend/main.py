@@ -262,6 +262,7 @@ def process_chapter(
     page_paths: list,
     language: str = "japanese",
     provider_id: str = "local",
+    external_manga_id: Optional[str] = None,
     db_url: str = None,
 ):
     """
@@ -290,6 +291,7 @@ def process_chapter(
             page_number=page_number,
             bubbles=bubble_data,
             language_code=language_code,
+            external_manga_id=external_manga_id,
             db_url=db_url,
         )
         results.append((img, bubble_data))

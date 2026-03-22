@@ -1,7 +1,7 @@
 """
 Database: SQL (PostgreSQL) via SQLModel.
 
-Schema: Manga → Chapters → Pages → Segments
+Schema: Users, reading_list; Manga → Chapters → Pages → Segments
 
 Utility Functions:
 
@@ -20,7 +20,7 @@ get_connection(db_url=None):
 
 init_db(db_url=None):
     Initializes the database schema by creating tables for all SQLModel models
-    (Manga, Chapters, Pages, Segments).
+    (Users, ReadingListEntry, Manga, Chapters, Pages, Segments).
 
 Other Core Database Functions:
 
@@ -47,11 +47,12 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from uuid import UUID
 from sqlalchemy import desc
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from .const import PROVIDER_IDS
-from .models import Manga, Chapters, Pages, Segments
+from .const import PROVIDER_IDS, PROVIDER_LOCAL
+from .models import Manga, MangaSource, Chapters, Pages, Segments, ReadingListEntry
 from .schemas import ChapterListOut, SegmentListOut
 
 
@@ -59,7 +60,7 @@ def _validate_provider_id(provider_id: str) -> None:
     if provider_id not in PROVIDER_IDS:
         raise ValueError(f"provider_id must be one of {sorted(PROVIDER_IDS)}, got {provider_id!r}")
 
-# Load backend/.env (parent of db package)
+
 try:
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -94,31 +95,111 @@ def get_connection(db_url=None):
 
 
 def init_db(db_url=None):
-    """Create tables: manga, chapters, pages, segments."""
+    """Create tables: users, reading_list, manga, manga_source, chapters, pages, segments."""
     engine = get_engine(db_url)
     SQLModel.metadata.create_all(engine)
 
 
-def _get_or_create_manga(session, provider_id: str, manga_title: str) -> int:
-    stmt = select(Manga).where(Manga.provider_id == provider_id, Manga.manga_title == manga_title)
+def _is_placeholder_external_manga_id(external_manga_id: str) -> bool:
+    """Synthetic ids we generate when the provider has no catalog key (local-*, legacy-*)."""
+    return external_manga_id.startswith("legacy-") or external_manga_id.startswith("local-")
+
+
+def _synthetic_external_manga_id(provider_id: str, manga_id: int) -> str:
+    """Stable per-umbrella id for manga_source when no real external id was passed."""
+    if provider_id == PROVIDER_LOCAL:
+        return f"local-{manga_id}"
+    return f"legacy-{manga_id}"
+
+
+def _ensure_manga_source(session, manga_id: int, provider_id: str, external_manga_id: str) -> None:
+    stmt = select(MangaSource).where(
+        MangaSource.manga_id == manga_id,
+        MangaSource.provider_id == provider_id,
+    )
     row = session.exec(stmt).first()
     if row:
+        if external_manga_id and not _is_placeholder_external_manga_id(external_manga_id):
+            row.external_manga_id = external_manga_id
+            session.add(row)
+            session.flush()
+        return
+    session.add(
+        MangaSource(
+            manga_id=manga_id,
+            provider_id=provider_id,
+            external_manga_id=external_manga_id,
+        )
+    )
+    session.flush()
+
+
+def resolve_manga_id(
+    session,
+    provider_id: str,
+    manga_title: str,
+    external_manga_id: Optional[str],
+) -> int:
+    """Find or create umbrella manga and ensure a MangaSource row for this provider."""
+    ext_in = (external_manga_id or "").strip()
+    if ext_in:
+        src = session.exec(
+            select(MangaSource).where(
+                MangaSource.provider_id == provider_id,
+                MangaSource.external_manga_id == ext_in,
+            )
+        ).first()
+        if src:
+            return src.manga_id
+
+    row = session.exec(select(Manga).where(Manga.manga_title == manga_title)).first()
+    if row:
+        synth = _synthetic_external_manga_id(provider_id, row.id)
+        _ensure_manga_source(session, row.id, provider_id, ext_in or synth)
         return row.id
-    m = Manga(provider_id=provider_id, manga_title=manga_title)
+
+    m = Manga(manga_title=manga_title)
     session.add(m)
     session.flush()
+    synth = _synthetic_external_manga_id(provider_id, m.id)
+    _ensure_manga_source(session, m.id, provider_id, ext_in or synth)
     return m.id
 
 
-def _get_or_create_chapter(session, manga_id: int, chapter_number: float, language_code: str) -> int:
+def resolve_manga_id_by_source(provider_id: str, external_manga_id: str, db_url=None) -> Optional[int]:
+    """Return umbrella manga id for a provider catalog id, if mapped."""
+    _validate_provider_id(provider_id)
+    ext = external_manga_id.strip()
+    if not ext:
+        return None
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        src = session.exec(
+            select(MangaSource).where(
+                MangaSource.provider_id == provider_id,
+                MangaSource.external_manga_id == ext,
+            )
+        ).first()
+        return src.manga_id if src else None
+
+
+def _get_or_create_chapter(
+    session, manga_id: int, provider_id: str, chapter_number: float, language_code: str
+) -> int:
     stmt = select(Chapters).where(
         Chapters.manga_id == manga_id,
+        Chapters.provider_id == provider_id,
         Chapters.chapter_number == chapter_number,
     )
     row = session.exec(stmt).first()
     if row:
         return row.id
-    ch = Chapters(manga_id=manga_id, chapter_number=chapter_number, language_code=language_code)
+    ch = Chapters(
+        manga_id=manga_id,
+        provider_id=provider_id,
+        chapter_number=chapter_number,
+        language_code=language_code,
+    )
     session.add(ch)
     session.flush()
     return ch.id
@@ -142,14 +223,16 @@ def save_page_translation(
     page_number: int,
     bubbles: list[dict],
     language_code: str,
+    *,
+    external_manga_id: Optional[str] = None,
     db_url=None,
 ) -> None:
     """Save one page's segments (replace existing for this provider/manga/chapter/page)."""
     _validate_provider_id(provider_id)
     engine = get_engine(db_url)
     with Session(engine) as session:
-        manga_id = _get_or_create_manga(session, provider_id, manga_title)
-        chapter_id = _get_or_create_chapter(session, manga_id, chapter_number, language_code)
+        manga_id = resolve_manga_id(session, provider_id, manga_title, external_manga_id)
+        chapter_id = _get_or_create_chapter(session, manga_id, provider_id, chapter_number, language_code)
         page_id = _get_or_create_page(session, chapter_id, page_number)
         for s in session.exec(select(Segments).where(Segments.page_id == page_id)).all():
             session.delete(s)
@@ -187,11 +270,12 @@ def delete_page_segments(
     _validate_provider_id(provider_id)
     engine = get_engine(db_url)
     with Session(engine) as session:
-        m = session.exec(select(Manga).where(Manga.provider_id == provider_id, Manga.manga_title == manga_title)).first()
+        m = session.exec(select(Manga).where(Manga.manga_title == manga_title)).first()
         if not m:
             return
         ch_stmt = select(Chapters).where(
             Chapters.manga_id == m.id,
+            Chapters.provider_id == provider_id,
             Chapters.chapter_number == chapter_number,
         )
         ch = session.exec(ch_stmt).first()
@@ -203,7 +287,7 @@ def delete_page_segments(
             return
         for seg in session.exec(select(Segments).where(Segments.page_id == page.id)).all():
             session.delete(seg)
-        session.flush()  # Execute segment deletes before page delete
+        session.flush()
         session.delete(page)
         session.commit()
 
@@ -218,12 +302,13 @@ def delete_chapter_segments(
     _validate_provider_id(provider_id)
     engine = get_engine(db_url)
     with Session(engine) as session:
-        m = session.exec(select(Manga).where(Manga.provider_id == provider_id, Manga.manga_title == manga_title)).first()
+        m = session.exec(select(Manga).where(Manga.manga_title == manga_title)).first()
         if not m:
             return
         ch = session.exec(
             select(Chapters).where(
                 Chapters.manga_id == m.id,
+                Chapters.provider_id == provider_id,
                 Chapters.chapter_number == chapter_number,
             )
         ).first()
@@ -233,18 +318,28 @@ def delete_chapter_segments(
         for page in pages:
             for seg in session.exec(select(Segments).where(Segments.page_id == page.id)).all():
                 session.delete(seg)
-        session.flush()  # Execute segment deletes before page deletes
+        session.flush()
         for page in pages:
             session.delete(page)
-        session.flush()  # Execute page deletes before chapter delete
+        session.flush()
         session.delete(ch)
         session.commit()
 
 
 def delete_all_manga(db_url=None) -> None:
-    """Delete all manga rows. Call only after all chapters are deleted (chapters reference manga)."""
+    """Delete all segments, pages, chapters, reading-list rows, manga_source rows, and manga rows."""
     engine = get_engine(db_url)
     with Session(engine) as session:
+        for seg in session.exec(select(Segments)).all():
+            session.delete(seg)
+        for p in session.exec(select(Pages)).all():
+            session.delete(p)
+        for ch in session.exec(select(Chapters)).all():
+            session.delete(ch)
+        for rl in session.exec(select(ReadingListEntry)).all():
+            session.delete(rl)
+        for ms in session.exec(select(MangaSource)).all():
+            session.delete(ms)
         for m in session.exec(select(Manga)).all():
             session.delete(m)
         session.commit()
@@ -259,7 +354,7 @@ def get_segments(
     offset: int = 0,
     db_url=None,
 ) -> list[SegmentListOut]:
-    """Query segments; returns rows with provider_id, manga_title, chapter_number, page_number, segment_index, x1..y2, original_text, translated_text, language_code, created_at. Supports limit/offset for pagination."""
+    """Query segments; provider_id filters on chapter. Supports limit/offset for pagination."""
     if provider_id is not None:
         _validate_provider_id(provider_id)
     engine = get_engine(db_url)
@@ -267,7 +362,7 @@ def get_segments(
         stmt = (
             select(
                 Segments.id,
-                Manga.provider_id,
+                Chapters.provider_id,
                 Manga.manga_title,
                 Chapters.chapter_number,
                 Pages.page_number,
@@ -284,7 +379,7 @@ def get_segments(
             .join(Manga, Chapters.manga_id == Manga.id)
         )
         if provider_id is not None:
-            stmt = stmt.where(Manga.provider_id == provider_id)
+            stmt = stmt.where(Chapters.provider_id == provider_id)
         if manga_title is not None:
             stmt = stmt.where(Manga.manga_title == manga_title)
         if chapter_number is not None:
@@ -327,6 +422,7 @@ def get_chapter_segments(
         db_url=db_url,
     )
 
+
 def list_chapters(
     manga_title: str,
     provider_id: Optional[str] = None,
@@ -334,17 +430,18 @@ def list_chapters(
     offset: int = 0,
     db_url=None,
 ) -> list[ChapterListOut]:
-    """List chapters (id, chapter_number, created_at, updated_at). Filters by manga_title; optionally by provider_id."""
+    """List chapters for an umbrella manga_title; optionally filter by chapter provider_id."""
     engine = get_engine(db_url)
     with Session(engine) as session:
         stmt = (
-            select(Manga.manga_title, Manga.provider_id, Chapters.id, Chapters.chapter_number, Chapters.created_at, Chapters.updated_at)
+            select(Manga.manga_title, Chapters.provider_id, Chapters.id, Chapters.chapter_number, Chapters.created_at, Chapters.updated_at)
             .select_from(Chapters)
             .join(Manga, Chapters.manga_id == Manga.id)
             .where(Manga.manga_title == manga_title)
         )
         if provider_id is not None:
-            stmt = stmt.where(Manga.provider_id == provider_id)
+            _validate_provider_id(provider_id)
+            stmt = stmt.where(Chapters.provider_id == provider_id)
         if offset > 0:
             stmt = stmt.offset(offset)
         if limit is not None and limit > 0:
@@ -367,14 +464,11 @@ def list_mangas(
     offset: int = 0,
 ) -> list[Manga]:
     """
-    List Manga (provider_id, manga_title, created_at, updated_at).
-    order_by: one of "provider_id", "manga_title", "created_at", "updated_at"
-    order_desc: True for descending (default), False for ascending
-    limit/offset: pagination (limit=None returns all)
+    List umbrella Manga rows.
+    order_by: one of "manga_title", "created_at", "updated_at"
     """
     engine = get_engine(db_url)
     order_map = {
-        "provider_id": Manga.provider_id,
         "manga_title": Manga.manga_title,
         "created_at": Manga.created_at,
         "updated_at": Manga.updated_at,
@@ -384,6 +478,81 @@ def list_mangas(
         col = desc(col)
     with Session(engine) as session:
         stmt = select(Manga).order_by(col)
+        if offset > 0:
+            stmt = stmt.offset(offset)
+        if limit is not None and limit > 0:
+            stmt = stmt.limit(limit)
+        return list(session.exec(stmt).all())
+
+
+def upsert_reading_list_entry(
+    user_id: UUID,
+    manga_id: int,
+    *,
+    last_chapter_number: Optional[float] = None,
+    db_url=None,
+) -> ReadingListEntry:
+    """Add or update a reading-list row for (user_id, manga_id)."""
+    engine = get_engine(db_url)
+    now = datetime.now(timezone.utc)
+    with Session(engine) as session:
+        stmt = select(ReadingListEntry).where(
+            ReadingListEntry.user_id == user_id,
+            ReadingListEntry.manga_id == manga_id,
+        )
+        row = session.exec(stmt).first()
+        if row:
+            if last_chapter_number is not None:
+                row.last_chapter_number = last_chapter_number
+            row.updated_at = now
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+            return row
+        entry = ReadingListEntry(
+            user_id=user_id,
+            manga_id=manga_id,
+            last_chapter_number=last_chapter_number,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(entry)
+        session.commit()
+        session.refresh(entry)
+        return entry
+
+
+def remove_reading_list_entry(user_id: UUID, manga_id: int, db_url=None) -> bool:
+    """Remove one reading-list row; returns True if a row was deleted."""
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        stmt = select(ReadingListEntry).where(
+            ReadingListEntry.user_id == user_id,
+            ReadingListEntry.manga_id == manga_id,
+        )
+        row = session.exec(stmt).first()
+        if not row:
+            return False
+        session.delete(row)
+        session.commit()
+        return True
+
+
+def list_reading_list_entries(
+    user_id: UUID,
+    *,
+    db_url=None,
+    limit: Optional[int] = None,
+    offset: int = 0,
+) -> list[ReadingListEntry]:
+    """List reading-list rows for a user, newest updates first."""
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        stmt = (
+            select(ReadingListEntry)
+            .where(ReadingListEntry.user_id == user_id)
+            .order_by(desc(ReadingListEntry.updated_at))
+        )
         if offset > 0:
             stmt = stmt.offset(offset)
         if limit is not None and limit > 0:
