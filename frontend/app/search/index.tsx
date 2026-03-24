@@ -5,7 +5,7 @@ import SearchBar from "../components/SearchBar";
 import SearchResults from "../components/SearchResults";
 import { Manga } from "../types/types";
 
-const BACKEND_URL = "http://localhost:8000"; // change this to your backend URL
+import { BACKEND_URL } from "../config";
 
 export default function SearchPage() {
   const { query } = useLocalSearchParams();

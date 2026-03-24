@@ -8,7 +8,7 @@ import {
 import { Manga, Chapter } from "../types/types";
 import PopUp from "./PopUp";
 
-const BACKEND_URL = "http://localhost:8000";
+import { BACKEND_URL } from "../config";
 
 interface MangaCardProps {
   manga: Manga;
