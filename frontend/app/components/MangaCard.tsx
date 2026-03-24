@@ -33,8 +33,6 @@ const MangaCard: React.FC<MangaCardProps> = ({ manga, width, height }) => {
       const res = await fetch(`${BACKEND_URL}/api/manga/${mangaId}/chapters`);
       const json = await res.json();
 
-      console.log("Raw chapter data from backend:", json);
-
       const data = (json.data || []).map((ch: any) => ({
         id: ch.id,
         chapter: ch.attributes.chapter || "?",
