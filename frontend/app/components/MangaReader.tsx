@@ -35,6 +35,7 @@ export default function MangaReader({ pages }: MangaReaderProps) {
             keyExtractor={(item, index) => index.toString()}
             renderItem={renderPage}
             initialNumToRender={3}
+            maxToRenderPerBatch={10}
             windowSize={100}
         />
     );
