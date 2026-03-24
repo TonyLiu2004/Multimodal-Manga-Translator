@@ -3,18 +3,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import { View, Text, ScrollView, StyleSheet } from "react-native";
 import SearchBar from "../components/SearchBar";
 import SearchResults from "../components/SearchResults";
-
-interface Manga {
-  id: string;
-  attributes: {
-    title: { [key: string]: string };
-    description: { en?: string };
-  };
-  relationships: {
-    type: string;
-    attributes?: { fileName?: string };
-  }[];
-}
+import { Manga } from "../types/types";
 
 export default function SearchPage() {
   const { query } = useLocalSearchParams();
@@ -65,10 +54,6 @@ export default function SearchPage() {
     }
   };
 
-  const handleMangaPress = (manga: Manga) => {
-    (router as any).push(`/manga/${manga.id}`);
-  };
-
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -86,7 +71,7 @@ export default function SearchPage() {
           <Text>Searching...</Text>
         </View>
       ) : (
-        <SearchResults mangaList={mangaList} onMangaPress={handleMangaPress} />
+        <SearchResults mangaList={mangaList} />
       )}
     </ScrollView>
   );

@@ -1,13 +1,7 @@
 import { useRouter } from "expo-router";
 import { Modal, Text, ScrollView, View, StyleSheet, Pressable, Image, ActivityIndicator } from "react-native";
 import React from 'react';
-
-interface Chapter {
-    id: string;
-    chapter: string;
-    title: string;
-    pages: number;
-}
+import { Chapter } from "../types/types";
 
 interface PopUpProps {
     visible: boolean;

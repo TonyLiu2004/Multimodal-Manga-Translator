@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, FlatList, Image, Dimensions, StyleSheet, Text, useWindowDimensions } from 'react-native';
+import { View, FlatList, Image, StyleSheet, Text, useWindowDimensions } from 'react-native';
 
 interface MangaReaderProps {
   pages: string[]; // Array of image URLs for manga pages
@@ -35,7 +35,6 @@ export default function MangaReader({ pages }: MangaReaderProps) {
             keyExtractor={(item, index) => index.toString()}
             renderItem={renderPage}
             initialNumToRender={3}
-            maxRenderPerBatch={5}
             windowSize={100}
         />
     );

@@ -1,29 +1,16 @@
 import React from "react";
 import { View, Text, FlatList, StyleSheet } from "react-native";
 import MangaCard from "./MangaCard";
-
-interface Manga {
-  id: string;
-  attributes: {
-    title: { [key: string]: string };
-    description: { en?: string };
-  };
-  relationships: {
-    type: string;
-    attributes?: { fileName?: string };
-  }[];
-}
+import { Manga } from "../types/types";
 
 interface MangaCategoryListProps {
   title: string;
   data: Manga[];
-  onMangaPress: (manga: Manga) => void;
 }
 
 const MangaCategoryList: React.FC<MangaCategoryListProps> = ({
   title,
   data,
-  onMangaPress,
 }) => {
   return (
     <View style={{ marginTop: 30 }}>
@@ -37,7 +24,6 @@ const MangaCategoryList: React.FC<MangaCategoryListProps> = ({
             manga={manga}
             width={200}
             height={300}
-            onPress={onMangaPress}
           />
         )}
       />

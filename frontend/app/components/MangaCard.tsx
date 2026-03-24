@@ -1,66 +1,102 @@
-import React from "react";
-import { View, Image, Pressable } from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Image,
+  Pressable,
+  StyleSheet,
+} from "react-native";
+import { Manga, Chapter } from "../types/types";
+import PopUp from "./PopUp";
 
-interface Manga {
-  id: string;
-  attributes: {
-    title: { [key: string]: string };
-    description: { en?: string };
-  };
-  relationships: {
-    type: string;
-    attributes?: { fileName?: string };
-  }[];
-}
+const BACKEND_URL = "http://localhost:8000";
 
 interface MangaCardProps {
   manga: Manga;
   width: number;
   height: number;
-  onPress: (manga: Manga) => void;
 }
 
-const MangaCard: React.FC<MangaCardProps> = ({
-  manga,
-  width,
-  height,
-  onPress,
-}) => {
-  // const titles = Object.values(manga.attributes.title);
-  // const displayTitle = (titles[0] as string) || "Untitled";
+const MangaCard: React.FC<MangaCardProps> = ({ manga, width, height }) => {
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [loadingChapters, setLoadingChapters] = useState(false);
 
-  // get cover art url
-  const coverArt = manga.relationships.find(
-    (rel: any) => rel.type === "cover_art",
-  );
+  const coverArt = manga.relationships?.find((rel) => rel.type === "cover_art");
   const fileName = coverArt?.attributes?.fileName;
   const coverUrl = fileName
     ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}.256.jpg`
     : "https://via.placeholder.com/256x360?text=No+Cover";
 
+  const fetchChapters = async (mangaId: string) => {
+    setLoadingChapters(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/manga/${mangaId}/chapters`);
+      const json = await res.json();
+
+      const data = (json.data || []).map((ch: any) => ({
+        id: ch.id,
+        chapter: ch.attributes.chapter || "?",
+        title: ch.attributes.title || "",
+        pages: ch.attributes.pages || 0,
+      }));
+
+      setChapters(data);
+    } catch (error) {
+      console.error("Error fetching chapters:", error);
+      setChapters([]);
+    } finally {
+      setLoadingChapters(false);
+    }
+  };
+
+  const handlePress = () => {
+    setPopupVisible(true);
+    fetchChapters(manga.id);
+  };
+
   return (
-    <View
-      style={{
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        marginHorizontal: 12,
-      }}
-    >
+    <View style={[styles.container, { width: width + 24 }]}>
       <Pressable
-        style={{
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        onPress={() => onPress(manga)}
+        style={({ pressed }) => [
+          styles.pressable,
+          { opacity: pressed ? 0.8 : 1 },
+        ]}
+        onPress={handlePress}
       >
         <Image
           source={{ uri: coverUrl }}
           style={{ width: width, height: height, borderRadius: 10 }}
         />
       </Pressable>
+
+      {/* The PopUp is now internal to each card */}
+      <PopUp
+        visible={popupVisible}
+        title={Object.values(manga.attributes.title)[0] || "Untitled"}
+        summary={
+          manga.attributes.description?.en || "No description available."
+        }
+        coverArt={coverUrl}
+        chapters={chapters}
+        loadingChapters={loadingChapters}
+        onClose={() => setPopupVisible(false)}
+      />
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 12,
+  },
+  pressable: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "#eee", // Placeholder color while loading
+  },
+});
 
 export default MangaCard;

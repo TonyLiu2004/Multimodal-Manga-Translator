@@ -8,25 +8,7 @@ import {
   Pressable,
 } from "react-native";
 import React, { useEffect, useState } from "react";
-
-interface Chapter {
-  id: string;
-  chapter: string;
-  title: string;
-  pages: number;
-}
-
-interface Manga {
-  id: string;
-  attributes: {
-    title: { [key: string]: string };
-    description: { en?: string };
-  };
-  relationships: {
-    type: string;
-    attributes?: { fileName?: string };
-  }[];
-}
+import { Manga, Chapter } from "../types/types";
 
 export default function MangaDetails() {
   const { id } = useLocalSearchParams();
