@@ -1,0 +1,1 @@
+export const BACKEND_URL = "http://localhost:8000"; // Change this to your backend URL
