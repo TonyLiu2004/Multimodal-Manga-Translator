@@ -5,6 +5,8 @@ import SearchBar from "../components/SearchBar";
 import SearchResults from "../components/SearchResults";
 import { Manga } from "../types/types";
 
+const BACKEND_URL = "http://localhost:8000"; // change this to your backend URL
+
 export default function SearchPage() {
   const { query } = useLocalSearchParams();
   const [searchQuery, setSearchQuery] = useState((query as string) || "");
@@ -24,11 +26,12 @@ export default function SearchPage() {
     setLoading(true);
     try {
       const response = await fetch(
-        `https://api.mangadex.org/manga?title=${searchTerm}&limit=20&includes[]=cover_art`,
+        `${BACKEND_URL}/api/manga/search?title=${searchTerm}&limit=20&includes[]=cover_art`,
         {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
         },
       );

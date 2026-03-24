@@ -27,11 +27,11 @@ export default function Index() {
   const loadHomePage = async () => {
     const [popular, recent, action, romance] = await Promise.all([
       fetchBackend("limit=10&order_by=followedCount&order_direction=desc"),
-      fetchMangaDex("limit=6&order[latestUploadedChapter]=desc"),
-      fetchMangaDex(
+      fetchBackend("limit=6&order[latestUploadedChapter]=desc"),
+      fetchBackend(
         "limit=6&includedTags[]=391b0423-d847-456f-aff0-8b0cfc03066b",
       ),
-      fetchMangaDex(
+      fetchBackend(
         "limit=6&includedTags[]=423e2eae-a7a2-4a8b-ac03-a8351462d71d",
       ),
     ]);
@@ -56,17 +56,17 @@ export default function Index() {
     }
   };
 
-  const fetchMangaDex = async (params: string) => {
-    try {
-      const res = await fetch(
-        `https://api.mangadex.org/manga?${params}&includes[]=cover_art`,
-      );
-      const json = await res.json();
-      return json.data || [];
-    } catch {
-      return [];
-    }
-  };
+  // const fetchMangaDex = async (params: string) => {
+  //   try {
+  //     const res = await fetch(
+  //       `https://api.mangadex.org/manga?${params}&includes[]=cover_art`,
+  //     );
+  //     const json = await res.json();
+  //     return json.data || [];
+  //   } catch {
+  //     return [];
+  //   }
+  // };
 
   const handleSearch = async () => {
     if (searchQuery.trim()) {
