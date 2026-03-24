@@ -3,6 +3,7 @@ export interface Manga {
   attributes: {
     title: { [key: string]: string };
     description: { en?: string };
+    availableTranslatedLanguages: string[];
   };
   relationships: {
     type: string;
@@ -15,4 +16,5 @@ export interface Chapter {
   chapter: string;
   title: string;
   pages: number;
+  language: string;
 }

@@ -33,11 +33,14 @@ const MangaCard: React.FC<MangaCardProps> = ({ manga, width, height }) => {
       const res = await fetch(`${BACKEND_URL}/api/manga/${mangaId}/chapters`);
       const json = await res.json();
 
+      console.log("Raw chapter data from backend:", json);
+
       const data = (json.data || []).map((ch: any) => ({
         id: ch.id,
         chapter: ch.attributes.chapter || "?",
         title: ch.attributes.title || "",
         pages: ch.attributes.pages || 0,
+        language: ch.attributes.translatedLanguage || "unknown",
       }));
 
       setChapters(data);
@@ -77,6 +80,7 @@ const MangaCard: React.FC<MangaCardProps> = ({ manga, width, height }) => {
           manga.attributes.description?.en || "No description available."
         }
         coverArt={coverUrl}
+        manga={manga}
         chapters={chapters}
         loadingChapters={loadingChapters}
         onClose={() => setPopupVisible(false)}
