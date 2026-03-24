@@ -122,7 +122,7 @@ In Terminal 2:
 ngrok http 8000
 ```
 
-Take the url provided by ngrok and paste it into the BACKEND_URL variable in frontend/app/index.tsx
+Take the url provided by ngrok and paste it into the BACKEND_URL variable in frontend/app/config.ts
 
 ### Deployment and redeployment
 
