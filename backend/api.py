@@ -153,7 +153,7 @@ async def get_popular_manga(
 async def get_chapters(
     manga_id: str,
     limit: int = 100,
-    translatedLanguage: list[str] = Query(['en']),
+    translatedLanguage: list[str] = Query(None),
     offset: int = 0,
     order_by: str = "chapter",
     order_direction: str = "desc",

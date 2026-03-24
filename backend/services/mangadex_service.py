@@ -54,7 +54,6 @@ async def get_manga_chapters(
     """
     url = f"{BASE_URL}/manga/{manga_id}/feed"
     params = {
-        "translatedLanguage[]": languages,
         "order[chapter]": "desc",
         "limit": limit,
         "offset": offset,
@@ -63,6 +62,8 @@ async def get_manga_chapters(
         f"order[{order_by}]": order_direction,
         "includes[]": ["scanlation_group"]
     }
+    if languages:
+        params["translatedLanguage[]"] = languages
 
     print(f"get_chapters called with params: {params}")
 
