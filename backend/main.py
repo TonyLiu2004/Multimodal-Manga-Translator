@@ -330,7 +330,7 @@ def test(img_path: Optional[str] = None):
         print(f"{img_path} does not exist")
 
 if __name__ == "__main__":
-    main()
-    # port = int(os.environ.get("PORT", 8000))
-    # print(f"--- Starting Production Server on Port {port} ---")
-    # uvicorn.run("api:app", host="0.0.0.0", port=port, reload=False) #uses api.py
+    # main()
+    port = int(os.environ.get("PORT", 8000))
+    print(f"--- Starting Production Server on Port {port} ---")
+    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=False) #uses api.py
