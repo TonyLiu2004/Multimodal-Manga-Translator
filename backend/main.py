@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from typing import Optional
 import db as manga_db
 from manga_ocr import MangaOcr
+import uvicorn
 
 
 ###
@@ -330,5 +331,5 @@ def test(img_path: Optional[str] = None):
 if __name__ == "__main__":
     # main()
     port = int(os.environ.get("PORT", 8000))
-    import uvicorn
-    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True) #uses api.py
+    print(f"--- Starting Production Server on Port {port} ---")
+    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=False) #uses api.py
