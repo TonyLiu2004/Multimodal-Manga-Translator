@@ -14,6 +14,8 @@ from helpers import get_project_root, setup_fonts
 from fastapi import FastAPI
 from typing import Optional
 import db as manga_db
+from manga_ocr import MangaOcr
+
 
 ###
 ###
@@ -46,8 +48,13 @@ app = FastAPI()
 
 #####################
 
-GLMOCR_MODEL_DIR = MODEL_PATH / "GlmOcr"
-ocr_model = OCR_Glm_Service(GLMOCR_MODEL_DIR)
+try:
+    ocr_model = MangaOcr()
+    print("loaded manga_ocr")
+except Exception as e:
+    print(f"Failed to load manga_ocr library, switching to local download. Exception: {e}")
+    GLMOCR_MODEL_DIR = MODEL_PATH / "GlmOcr"
+    ocr_model = OCR_Glm_Service(GLMOCR_MODEL_DIR)
 
 JAPANESE_OCR_MODEL_DIR = MODEL_PATH / "Kha-white"
 ocr_japanese_model = OCR_Japanese_Service(JAPANESE_OCR_MODEL_DIR)
@@ -321,7 +328,7 @@ def test(img_path: Optional[str] = None):
         print(f"{img_path} does not exist")
 
 if __name__ == "__main__":
-    # main()
-    port = int(os.environ.get("PORT", 8000))
-    import uvicorn
-    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True) #uses api.py
+    main()
+    # port = int(os.environ.get("PORT", 8000))
+    # import uvicorn
+    # uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True) #uses api.py

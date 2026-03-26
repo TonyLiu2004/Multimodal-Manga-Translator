@@ -3,38 +3,31 @@ import torch
 import os
 from pathlib import Path
 from helpers import get_project_root
-from manga_ocr import MangaOcr
 
 class OCR_Glm_Service:
     def __init__(self, ocr_path=None, device=None):
-        try: 
-            print("Initializing Manga-OCR (ONNX)...")
-            self.mocr = MangaOcr()
-            print("Loaded Manga-OCR successfully")
-        except Exception as e:
-            print(f"MangaOcr import failed, attempting to download GLM OCR locally. Error: {e}")
-            ROOT = get_project_root()
-            self.base_model_path = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
-                
-            if not ocr_path:
-                ocr_path = self.base_model_path / "GlmOcr"
-            else:
-                ocr_path = Path(ocr_path)
+        ROOT = get_project_root()
+        self.base_model_path = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
+            
+        if not ocr_path:
+            ocr_path = self.base_model_path / "GlmOcr"
+        else:
+            ocr_path = Path(ocr_path)
 
-            processor_path = ocr_path / "processor"
-            model_path = ocr_path / "model"
+        processor_path = ocr_path / "processor"
+        model_path = ocr_path / "model"
 
-            if not processor_path.exists() or not model_path.exists():
-                print(f"GLM OCR processor/model not found at {ocr_path}. Attempting to download")
-                self.load_model()
+        if not processor_path.exists() or not model_path.exists():
+            print(f"GLM OCR processor/model not found at {ocr_path}. Attempting to download")
+            self.load_model()
 
-            if processor_path.exists() and model_path.exists():
-                self.processor = AutoProcessor.from_pretrained(processor_path)
-                self.model = AutoModelForImageTextToText.from_pretrained(model_path, tie_word_embeddings=False)
-                self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-                print("Loaded glm OCR")
-            else:
-                raise FileNotFoundError(f"Error: Could not find or retrieve {model_path}")
+        if processor_path.exists() and model_path.exists():
+            self.processor = AutoProcessor.from_pretrained(processor_path)
+            self.model = AutoModelForImageTextToText.from_pretrained(model_path, tie_word_embeddings=False)
+            self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+            print("Loaded glm OCR")
+        else:
+            raise FileNotFoundError(f"Error: Could not find or retrieve {model_path}")
 
     def runOCR(self, image_url):
         # image = Image.open(image_url).convert("RGB")
