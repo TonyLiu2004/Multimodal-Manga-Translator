@@ -94,8 +94,9 @@ sympy==1.14.0
 termcolor==3.3.0
 timm==1.0.24
 tokenizers==0.22.2
-# torch==2.10.0+cpu
-torchvision==0.25.0
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
 tornado==6.5.4
 tqdm==4.67.3
 # traitlets==5.14.3

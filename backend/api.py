@@ -119,8 +119,6 @@ def value_error_handler(request, exc):
 ###########
 ###########
 
-
-
 @app.get("/api/manga/chapter/{chapter_id}/page/{page_index}")
 async def proxy_manga_page(chapter_id: str, page_index: int):
     urls = mangadex_service.get_chapter_panel_urls(chapter_id)
