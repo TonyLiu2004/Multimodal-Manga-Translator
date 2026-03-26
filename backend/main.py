@@ -1,8 +1,8 @@
 from services.OCR_glm_service import OCR_Glm_Service
-from services.translate_tencentHY_service import Translate_Tencent_Service
-from services.bubble_detector_kitsumed_service import Bubble_Detector_Kitsumed_Service
+# from services.translate_tencentHY_service import Translate_Tencent_Service
+# from services.bubble_detector_kitsumed_service import Bubble_Detector_Kitsumed_Service
 from services.bubble_detector_kiuyha_service import Bubble_Detector_Kiuyha_Service
-from services.OCR_japanese_service import OCR_Japanese_Service
+# from services.OCR_japanese_service import OCR_Japanese_Service
 from services.translate_qwen_service import Translate_Qwen_Service
 from PIL import Image, ImageDraw, ImageFont
 import tempfile
@@ -57,13 +57,13 @@ except Exception as e:
     GLMOCR_MODEL_DIR = MODEL_PATH / "GlmOcr"
     ocr_model = OCR_Glm_Service(GLMOCR_MODEL_DIR)
 
-JAPANESE_OCR_MODEL_DIR = MODEL_PATH / "Kha-white"
-ocr_japanese_model = OCR_Japanese_Service(JAPANESE_OCR_MODEL_DIR)
+# JAPANESE_OCR_MODEL_DIR = MODEL_PATH / "Kha-white"
+# ocr_japanese_model = OCR_Japanese_Service(JAPANESE_OCR_MODEL_DIR)
 
 BUBBLE_DETECTOR_MODEL_DIR = MODEL_PATH / "kiuyha.pt"
 bubble_detector_model = Bubble_Detector_Kiuyha_Service(BUBBLE_DETECTOR_MODEL_DIR)
 
-cn_translate_model = Translate_Tencent_Service()
+# cn_translate_model = Translate_Tencent_Service()
 
 translate_model = Translate_Qwen_Service()
 
@@ -179,11 +179,12 @@ def process_image(image_path, language):
             temp_path = f.name
 
         text = ""
-        if language == "japanese":
-            text = ocr_japanese_model.runOCR(temp_path)
-            # text = mocr(temp_path)
-        else:
-            text = ocr_model.runOCR(temp_path)
+        # if language == "japanese":
+        #     # text = ocr_japanese_model.runOCR(temp_path)
+        #     text = ocr_model(temp_path)
+        # else:
+        #     text = ocr_model.runOCR(temp_path)
+        text = ocr_model(temp_path)
 
         text = re.sub(r'[\n\r\u2028\u2029]+', ' ', text) #remove new lines
         texts.append({"id": i, "text": text})
@@ -329,7 +330,7 @@ def test(img_path: Optional[str] = None):
         print(f"{img_path} does not exist")
 
 if __name__ == "__main__":
-    # main()
-    port = int(os.environ.get("PORT", 8000))
-    print(f"--- Starting Production Server on Port {port} ---")
-    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=False) #uses api.py
+    main()
+    # port = int(os.environ.get("PORT", 8000))
+    # print(f"--- Starting Production Server on Port {port} ---")
+    # uvicorn.run("api:app", host="0.0.0.0", port=port, reload=False) #uses api.py

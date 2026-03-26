@@ -1,11 +1,10 @@
-from transformers import AutoModelForImageTextToText, AutoProcessor
-import torch
 import os
 from pathlib import Path
 from helpers import get_project_root
 
 class OCR_Glm_Service:
     def __init__(self, ocr_path=None, device=None):
+        from transformers import AutoModelForImageTextToText, AutoProcessor
         ROOT = get_project_root()
         self.base_model_path = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
             
@@ -24,7 +23,7 @@ class OCR_Glm_Service:
         if processor_path.exists() and model_path.exists():
             self.processor = AutoProcessor.from_pretrained(processor_path)
             self.model = AutoModelForImageTextToText.from_pretrained(model_path, tie_word_embeddings=False)
-            self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+            self.device = device if device else "cpu"
             print("Loaded glm OCR")
         else:
             raise FileNotFoundError(f"Error: Could not find or retrieve {model_path}")
@@ -54,6 +53,7 @@ class OCR_Glm_Service:
         return output_text
     
     def load_model(self):
+        from transformers import AutoModelForImageTextToText, AutoProcessor
         GLMOCR_MODEL_DIR = self.base_model_path / "GlmOcr"
         DOWNLOAD_MODEL = "zai-org/GLM-OCR"
 

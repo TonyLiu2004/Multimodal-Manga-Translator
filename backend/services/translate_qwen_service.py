@@ -1,6 +1,4 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM
 import json
-import torch
 import os
 import requests
 from pathlib import Path
@@ -11,7 +9,7 @@ class Translate_Qwen_Service:
     def __init__(self, device=None):
         self.tokenizer = None
         self.model = None
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device if device else "cpu"
 
         ROOT = get_project_root()
         self.base_model_path = Path(os.getenv("MODEL_PATH", ROOT / "backend" / "models"))
@@ -19,6 +17,7 @@ class Translate_Qwen_Service:
 
     def initialize_local_models(self):
         "internal method to only load local models when needed"
+        from transformers import AutoTokenizer, AutoModelForCausalLM
         if self.model is not None and self.tokenizer is not None:
             return
 
@@ -37,6 +36,7 @@ class Translate_Qwen_Service:
             raise FileNotFoundError(f"Error: Could not find or retrieve {model_path}")
 
     def load_model(self):
+        from transformers import AutoTokenizer, AutoModelForCausalLM
         DOWNLOAD_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 
         tokenizer = AutoTokenizer.from_pretrained(DOWNLOAD_MODEL)
