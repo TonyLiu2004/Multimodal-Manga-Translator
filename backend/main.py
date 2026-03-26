@@ -14,7 +14,6 @@ from helpers import get_project_root, setup_fonts
 from fastapi import FastAPI
 from typing import Optional
 import db as manga_db
-from manga_ocr import MangaOcr
 import uvicorn
 
 
@@ -49,13 +48,8 @@ app = FastAPI()
 
 #####################
 
-try:
-    ocr_model = MangaOcr()
-    print("loaded manga_ocr")
-except Exception as e:
-    print(f"Failed to load manga_ocr library, switching to local download. Exception: {e}")
-    GLMOCR_MODEL_DIR = MODEL_PATH / "GlmOcr"
-    ocr_model = OCR_Glm_Service(GLMOCR_MODEL_DIR)
+# GLMOCR_MODEL_DIR = MODEL_PATH / "GlmOcr"
+# ocr_model = OCR_Glm_Service(GLMOCR_MODEL_DIR)
 
 # JAPANESE_OCR_MODEL_DIR = MODEL_PATH / "Kha-white"
 # ocr_japanese_model = OCR_Japanese_Service(JAPANESE_OCR_MODEL_DIR)
@@ -86,6 +80,10 @@ print("Finished loading all models and fonts")
 ###
 ###
 ###
+
+def get_ocr():
+    from manga_ocr import MangaOcr
+    return MangaOcr()
 
 def show_boxes(image_path):
     result = bubble_detector_model.predict(image_path)
@@ -164,6 +162,7 @@ def process_image(image_path, language):
     img = Image.open(image_path)
     draw = ImageDraw.Draw(img)
 
+    ocr_model = get_ocr()
     texts = []
     coordinates={}
     i=0
@@ -184,7 +183,12 @@ def process_image(image_path, language):
         #     text = ocr_model(temp_path)
         # else:
         #     text = ocr_model.runOCR(temp_path)
-        text = ocr_model(temp_path)
+        
+        try:
+            # MangaOcr is callable: mocr(image)
+            text = ocr_model(box_cropped) 
+        except Exception as e:
+            print(f"OCR Error on bubble {i}: {e}")
 
         text = re.sub(r'[\n\r\u2028\u2029]+', ' ', text) #remove new lines
         texts.append({"id": i, "text": text})
@@ -255,9 +259,6 @@ def translate_text(text, language):
     translated_text = translate_model.translate(text)
 
     return translated_text
-
-def runOCRTests(image_url):
-    text = ocr_model.runOCR(image_url)
 
 def _language_to_code(language: str) -> str:
     """Map language name to ISO 639-1 style code for DB."""
