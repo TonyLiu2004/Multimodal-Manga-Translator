@@ -2,3 +2,4 @@
 /services/__pycache__
 /fonts
 /venv_backend
+.env

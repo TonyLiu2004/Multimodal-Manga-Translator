@@ -1,1 +1,1 @@
-export const BACKEND_URL = "http://localhost:8000"; // Change this to your backend URL
+export const BACKEND_URL = "https://tonyliu404-manglify-backend.hf.space/"; // Change this to your backend URL
