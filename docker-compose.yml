@@ -4,7 +4,7 @@ services:
       - db
     build:
       context: ./backend
-      dockerfile: Dockerfile.cpu
+      dockerfile: Dockerfile
     container_name: manga-backend
     ports:
       - "8000:8000"

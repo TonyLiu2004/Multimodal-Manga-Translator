@@ -1,4 +1,4 @@
-from services.OCR_glm_service import OCR_Glm_Service
+# from services.OCR_glm_service import OCR_Glm_Service
 # from services.translate_tencentHY_service import Translate_Tencent_Service
 # from services.bubble_detector_kitsumed_service import Bubble_Detector_Kitsumed_Service
 from services.bubble_detector_kiuyha_service import Bubble_Detector_Kiuyha_Service

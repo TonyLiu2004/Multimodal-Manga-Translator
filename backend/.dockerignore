@@ -2,3 +2,15 @@ models/
 fonts/
 .venv/
 __pycache__/
+
+backend/models/
+backend/fonts/
+
+# Ignore Python and Git bloat
+.git/
+.gitignore
+__pycache__/
+*.pyc
+.env
+venv/
+.vscode/

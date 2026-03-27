@@ -21,6 +21,7 @@ COPY . .
 # This ensures they are part of the "permanent" image and not deleted on restart
 RUN env PYTHONPATH=. python -c "from services.bubble_detector_kiuyha_service import Bubble_Detector_Kiuyha_Service; b = Bubble_Detector_Kiuyha_Service();"
 RUN env PYTHONPATH=. python -c "from helpers import setup_fonts; setup_fonts()"
+RUN env PYTHONPATH=. python -c "from manga_ocr import MangaOcr; MangaOcr()"
 
 # 8. Expose and Start
 EXPOSE 8000
