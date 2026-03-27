@@ -18,6 +18,10 @@ RUN pip install --no-cache-dir \
 # 7. Copy your project files
 COPY . .
 
+# This ensures they are part of the "permanent" image and not deleted on restart
+RUN python -c "from services.bubble_service import BubbleService; b = BubbleService(); b.download_model()"
+RUN python -c "from helpers import download_fonts; download_fonts()"
+
 # 8. Expose and Start
 EXPOSE 8000
 CMD ["python", "main.py"]
