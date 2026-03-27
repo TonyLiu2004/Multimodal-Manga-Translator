@@ -20,12 +20,17 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           # 1. Identify the HF Repo URL (Replace with your actual Space name)
-          HF_REPO="https://tonyliu404:$HF_TOKEN@huggingface.co/spaces/tonyliu404/Manglify_Backend"
+          HF_REPO="https://huggingface.co/spaces/tonyliu404/Manglify_Backend"
+
+          git remote add hf "$HF_REPO"
+          git lfs push hf main
+
           # 2. Push the backend folder to the HF Repo using git subtree
+          git branch -D deploy || true
           git subtree split --prefix backend -b deploy
 
           # 3. Force push the local 'deploy' branch to the remote 'main' branch
-          git push "$HF_REPO" deploy:main --force
+          git push https://tonyliu404:$HF_TOKEN@huggingface.co/spaces/tonyliu404/Manglify_Backend deploy:main --force
 
           # 4. Delete the temporary local branch
           git branch -D deploy

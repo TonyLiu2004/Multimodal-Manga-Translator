@@ -1,6 +1,7 @@
 models/
 fonts/
 .venv/
+.venv_backend/
 __pycache__/
 
 backend/models/
