@@ -4,6 +4,8 @@ FROM python:3.12-slim
 # 2. Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+#huggingface port
+ENV PORT=7860 
 
 # 3. Install system dependencies
 RUN apt-get update && apt-get install -y libgl1 libglib2.0-0
@@ -24,5 +26,5 @@ RUN env PYTHONPATH=. python -c "from helpers import setup_fonts; setup_fonts()"
 RUN env PYTHONPATH=. python -c "from manga_ocr import MangaOcr; MangaOcr()"
 
 # 8. Expose and Start
-EXPOSE 8000
+EXPOSE 7860
 CMD ["python", "main.py"]

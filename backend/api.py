@@ -3,33 +3,35 @@ Read-only API for the frontend. Wraps db list_entries, get_segments, get_chapter
 Run from backend:  uvicorn api:app --reload --host 0.0.0.0 --port 8000
 """
 
-from fastapi import FastAPI, Query
+from fastapi import APIRouter, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import proxy
 from services import mangadex_service
+from services.image_processor import ImageProcessor
 import httpx
 import db
 from sqlmodel import Session, text
 from db.models import Manga
 from db.schemas import ChapterListOut, SegmentListOut
 
-app = FastAPI(
-    title="Manga Translator API",
-    description="Read endpoints for chapters and segments",
-    version="1.0.0",
-)
+# app = FastAPI(
+#     title="Manga Translator API",
+#     description="Read endpoints for chapters and segments",
+#     version="1.0.0",
+# )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # Currently allow all origins, should be restricted to specific origins in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"], # Currently allow all origins, should be restricted to specific origins in production
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
+router = APIRouter()
 
-@app.get("/")
+@router.get("/")
 def root():
     """API root - confirms the API is running."""
     return {
@@ -39,7 +41,7 @@ def root():
         "health": "/health",
     }
 
-@app.get("/health/db")
+@router.get("/health/db")
 def health_db():
     engine = db.get_engine()
     try:
@@ -50,7 +52,7 @@ def health_db():
         return {"status": "error", "detail": str(e)}
 
 
-@app.get("/mangas", response_model=list[Manga])
+@router.get("/mangas", response_model=list[Manga])
 def list_mangas(
     order_by: str = Query("created_at", description="manga_title | created_at | updated_at"),
     order_desc: bool = Query(True, description="Sort descending"),
@@ -60,7 +62,7 @@ def list_mangas(
     """List mangas (manga_title, created_at, updated_at). Supports pagination."""
     return db.list_mangas(order_by=order_by, order_desc=order_desc, limit=limit, offset=offset)
 
-@app.get("/chapters", response_model=list[ChapterListOut])
+@router.get("/chapters", response_model=list[ChapterListOut])
 def list_chapters(
     manga_title: str = Query(...),
     provider_id: str | None = Query(None, description="e.g. local, mangadex"),
@@ -71,7 +73,7 @@ def list_chapters(
     return db.list_chapters(manga_title, provider_id, limit=limit, offset=offset)
 
 
-@app.get("/segments", response_model=list[SegmentListOut])
+@router.get("/segments", response_model=list[SegmentListOut])
 def get_segments(
     provider_id: str | None = Query(None, description="e.g. local, mangadex"),
     manga_title: str | None = Query(None),
@@ -91,7 +93,7 @@ def get_segments(
     )
 
 
-@app.get("/chapters/segments", response_model=list[SegmentListOut])
+@router.get("/chapters/segments", response_model=list[SegmentListOut])
 def get_chapter_segments(
     provider_id: str = Query(..., description="e.g. local, mangadex"),
     manga_title: str = Query(...),
@@ -104,22 +106,16 @@ def get_chapter_segments(
 
 
 # to make sure api is running and responding
-@app.get("/health")
+@router.get("/health")
 def health():
     """Health check."""
     return {"status": "ok"}
 
-
-@app.exception_handler(ValueError)
-def value_error_handler(request, exc):
-    """Return 400 for invalid provider_id etc."""
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
-
 ###########
 ###########
 ###########
 
-@app.get("/api/manga/chapter/{chapter_id}/page/{page_index}")
+@router.get("/api/manga/chapter/{chapter_id}/page/{page_index}")
 async def proxy_manga_page(chapter_id: str, page_index: int):
     urls = mangadex_service.get_chapter_panel_urls(chapter_id)
     if not urls or page_index >= len(urls):
@@ -127,12 +123,12 @@ async def proxy_manga_page(chapter_id: str, page_index: int):
 
     return await proxy.get_manga_page_stream(urls[page_index])
 
-@app.get("/api/manga/cover_art")
+@router.get("/api/manga/cover_art")
 async def proxy_manga_cover_art(manga_id: str, cover_url: str, size: int = 256):
     url = f"https://uploads.mangadex.org/covers/{manga_id}/{cover_url}.{size}.jpg"
     return await proxy.get_manga_page_stream(url)
 
-@app.get("/api/manga/search")
+@router.get("/api/manga/search")
 async def get_popular_manga(
     title: str = "",
     limit: int = 15,
@@ -152,7 +148,7 @@ async def get_popular_manga(
     return results
 
 
-@app.get("/api/manga/{manga_id}/chapters")
+@router.get("/api/manga/{manga_id}/chapters")
 async def get_chapters(
     manga_id: str,
     limit: int = 100,
