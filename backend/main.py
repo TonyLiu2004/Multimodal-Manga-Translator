@@ -159,6 +159,7 @@ def upscale_for_ocr(img, scale=2):
 
 def process_image(image_path, language):
     bubble_results = bubble_detector_model.predict(image_path)
+    print(f"bubble results: {bubble_results}")
     img = Image.open(image_path)
     draw = ImageDraw.Draw(img)
 
@@ -167,6 +168,7 @@ def process_image(image_path, language):
     coordinates={}
     i=0
     for box_data in bubble_results:
+        print(f"box_data {i}")
         coords = box_data['coords']
         draw.rectangle(coords, outline="red", width=1)
         box_cropped = img.crop(coords)
@@ -183,7 +185,7 @@ def process_image(image_path, language):
         #     text = ocr_model(temp_path)
         # else:
         #     text = ocr_model.runOCR(temp_path)
-        
+
         try:
             # MangaOcr is callable: mocr(image)
             text = ocr_model(box_cropped) 
@@ -319,10 +321,11 @@ def main():
 
 @app.post("/")
 def test(img_path: Optional[str] = None):
+    print("test called")
     if not img_path:
         img_path = "./test_2.png"
     img_path = Path(img_path)
-
+    print(f"image path: {img_path}")
     if img_path.exists():
         img, bubble_data = process_image(img_path, "japanese")
         print(bubble_data)
@@ -334,5 +337,5 @@ if __name__ == "__main__":
     # main()
     port = int(os.environ.get("PORT", 8000))
     print(f"--- Starting Production Server on Port {port} ---")
-    # uvicorn.run("api:app", host="0.0.0.0", port=port, reload=False) #uses api.py
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=False) #uses api.py
+    # uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
