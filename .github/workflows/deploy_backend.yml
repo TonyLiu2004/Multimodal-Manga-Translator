@@ -22,9 +22,9 @@ jobs:
           HF_REPO="https://tonyliu404:$HF_TOKEN@huggingface.co/spaces/tonyliu404/Manglify_Backend"
           # 2. Push the backend folder to the HF Repo using git subtree
           git subtree split --prefix backend -b deploy
-          
+
           # 3. Force push the local 'deploy' branch to the remote 'main' branch
           git push "$HF_REPO" deploy:main --force
-          
+
           # 4. Delete the temporary local branch
           git branch -D deploy
