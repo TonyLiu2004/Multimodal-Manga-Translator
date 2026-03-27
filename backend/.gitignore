@@ -3,3 +3,4 @@
 /fonts
 /venv_backend
 .env
+*.png
