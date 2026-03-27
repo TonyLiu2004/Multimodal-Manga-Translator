@@ -41,6 +41,7 @@ jobs:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_MANGIFY }}"
           projectId: manglify-d6ebc
+          channelId: live
           entryPoint: frontend # Points to where your firebase.json is
 
       - name: Update Deployment Status

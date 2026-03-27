@@ -82,7 +82,7 @@ export default function Index() {
         padding: 20,
       }}
     >
-      <Text style={styles.h1}>Manglify</Text>
+      <Text style={styles.h1}>Manglify testing deploy</Text>
 
       <SearchBar
         placeholder="Search manga..."
