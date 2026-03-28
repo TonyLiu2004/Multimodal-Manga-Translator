@@ -124,8 +124,9 @@ async def proxy_manga_page(chapter_id: str, page_index: int):
     return await proxy.get_manga_page_stream(urls[page_index])
 
 @router.get("/api/manga/cover_art")
-async def proxy_manga_cover_art(manga_id: str, cover_url: str, size: int = 256):
-    url = f"https://uploads.mangadex.org/covers/{manga_id}/{cover_url}.{size}.jpg"
+async def proxy_manga_cover_art(manga_id: str, file_name: str, size: int = 256):
+    url = f"https://uploads.mangadex.org/covers/{manga_id}/{file_name}.{size}.jpg"
+    print(url)
     return await proxy.get_manga_page_stream(url)
 
 @router.get("/api/manga/search")
