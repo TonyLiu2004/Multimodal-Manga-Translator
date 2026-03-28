@@ -24,6 +24,9 @@ jobs:
 
           # Create deploy branch from backend subtree
           git subtree split --prefix backend -b deploy
+
+          # Remove all .png files from the deploy branch
+          git filter-branch --index-filter "git rm --cached --ignore-unmatch *.png" deploy
           
           # Force push the local 'deploy' branch to the remote 'main' branch
           git push https://tonyliu404:$HF_TOKEN@huggingface.co/spaces/tonyliu404/Manglify_Backend deploy:main --force
