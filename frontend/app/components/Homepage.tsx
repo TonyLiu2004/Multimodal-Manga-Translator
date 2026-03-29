@@ -16,7 +16,7 @@ export default function Index() {
   const [recentManga, setRecentManga] = useState<Manga[]>([]);
   const [actionManga, setActionManga] = useState<Manga[]>([]);
   const [romanceManga, setRomanceManga] = useState<Manga[]>([]);
-  const { session, loading: authLoading, userLabel, signOut } = useAuth();
+  const { session, loading: authLoading, userLabel } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -75,50 +75,14 @@ export default function Index() {
 
   return (
     <ScrollView
+      style={{ flex: 1 }}
       contentContainerStyle={{
         flexGrow: 1,
         alignItems: "center",
         padding: 20,
       }}
     >
-      <View style={styles.headerRow}>
-        {authLoading && isSupabaseConfigured() ? (
-          <View style={styles.authRowPlaceholder} />
-        ) : !session ? (
-          <View style={styles.authRow}>
-            <Pressable onPress={() => router.push("/sign-in")}>
-              <Text style={styles.authLink}>Sign in</Text>
-            </Pressable>
-            <Text style={styles.authSep}>·</Text>
-            <Pressable onPress={() => router.push("/sign-up")}>
-              <Text style={styles.authLink}>Sign up</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.authRow}>
-            <Pressable
-              onPress={() => router.push("/profile")}
-              style={({ pressed }) => [
-                styles.userLabelPressable,
-                pressed && styles.userLabelPressed,
-              ]}
-            >
-              <Text
-                style={styles.userLabel}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {userLabel}
-              </Text>
-            </Pressable>
-            <Text style={styles.authSep}>·</Text>
-            <Pressable onPress={() => void signOut()}>
-              <Text style={styles.signOut}>Sign out</Text>
-            </Pressable>
-          </View>
-        )}
-      </View>
-      <Text style={styles.h1}>Manglify</Text>
+        <Text style={styles.h1}>Manglify</Text>
 
       <SearchBar
         placeholder="Search manga..."
@@ -143,58 +107,5 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "bold",
     flexShrink: 1,
-  },
-  headerRow: {
-    alignSelf: "stretch",
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    marginBottom: 12,
-    gap: 12,
-  },
-  authRowPlaceholder: {
-    minHeight: 22,
-    marginBottom: 8,
-  },
-  authRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-    maxWidth: "100%",
-    flexShrink: 1,
-    justifyContent: "flex-end",
-  },
-  userLabelPressable: {
-    flexShrink: 1,
-    maxWidth: 200,
-  },
-  userLabelPressed: {
-    opacity: 0.65,
-  },
-  userLabel: {
-    fontSize: 15,
-    color: "#1565c0",
-    flexShrink: 1,
-  },
-  authLink: {
-    fontSize: 15,
-    color: "#1565c0",
-  },
-  authSep: {
-    fontSize: 15,
-    color: "#999",
-  },
-  signOut: {
-    fontSize: 15,
-    color: "#666",
-  },
-  input: {
-    height: 50,
-    width: "60%",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    backgroundColor: "#FAFAFA",
   },
 });

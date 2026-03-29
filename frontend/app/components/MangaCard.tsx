@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 12,
+    marginHorizontal: 5,
   },
   pressable: {
     alignItems: "center",

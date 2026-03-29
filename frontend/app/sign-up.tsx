@@ -9,7 +9,7 @@ import {
   Text,
   TextInput,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { type Href, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 
@@ -41,13 +41,6 @@ export default function SignUpScreen() {
     setMessage(null);
     setError(null);
 
-    if (!isSupabaseConfigured()) {
-      setError(
-        "Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env and restart Expo."
-      );
-      return;
-    }
-
     const trimmed = email.trim();
     if (!trimmed || !password) {
       setError("Enter email and password.");
@@ -77,22 +70,19 @@ export default function SignUpScreen() {
 
       // Supabase may return 200 with a user but no new identity when the email is already registered.
       const identities = data.user?.identities;
-      if (
-        data.user &&
-        (!identities || identities.length === 0)
-      ) {
+      if (data.user && (!identities || identities.length === 0)) {
         setError("That email already has an account. Sign in instead.");
         return;
       }
 
       if (data.session) {
         setMessage("Account created. You are signed in.");
-        router.replace("/");
+        router.replace("/" as Href);
         return;
       }
 
       setMessage(
-        "Check your email for a confirmation link, then sign in on the Sign in screen."
+        "Check your email for a confirmation link, then sign in on the Sign in screen.",
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -111,14 +101,10 @@ export default function SignUpScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scroll}
         >
+          <Pressable onPress={() => router.push("/" as Href)}>
+            <Text style={styles.textCenter}>Manglify</Text>
+          </Pressable>
           <Text style={styles.title}>Create account</Text>
-
-          {!isSupabaseConfigured() ? (
-            <Text style={styles.hint}>
-              Copy .env.example to .env in the frontend folder, paste your
-              Supabase URL and anon key, then restart the dev server.
-            </Text>
-          ) : null}
 
           <TextInput
             style={styles.input}
@@ -170,13 +156,13 @@ export default function SignUpScreen() {
             )}
           </Pressable>
 
-          <Pressable onPress={() => router.push("/sign-in")} style={styles.linkWrap}>
+          <Pressable
+            onPress={() => router.push("/sign-in")}
+            style={styles.linkWrap}
+          >
             <Text style={styles.link}>Already have an account? Sign in</Text>
           </Pressable>
 
-          <Pressable onPress={() => router.back()} style={styles.linkWrap}>
-            <Text style={styles.muted}>Back</Text>
-          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -195,9 +181,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: "bold",
     marginBottom: 20,
     color: "#111",
+  },
+  textCenter: {
+    fontSize: 32,
+    fontWeight: "bold",
+    flexShrink: 1,
+    textAlign: "center",
   },
   hint: {
     fontSize: 14,

@@ -9,9 +9,9 @@ import {
   Text,
   TextInput,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { type Href, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -22,13 +22,6 @@ export default function SignInScreen() {
 
   const onSubmit = async () => {
     setError(null);
-
-    if (!isSupabaseConfigured()) {
-      setError(
-        "Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env."
-      );
-      return;
-    }
 
     const trimmed = email.trim();
     if (!trimmed || !password) {
@@ -49,7 +42,7 @@ export default function SignInScreen() {
         return;
       }
 
-      router.replace("/");
+      router.replace("/" as Href);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -67,6 +60,9 @@ export default function SignInScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scroll}
         >
+          <Pressable onPress={() => router.push("/" as Href)}>
+            <Text style={styles.textCenter}>Manglify</Text>
+          </Pressable>
           <Text style={styles.title}>Sign in</Text>
 
           <TextInput
@@ -102,12 +98,11 @@ export default function SignInScreen() {
             )}
           </Pressable>
 
-          <Pressable onPress={() => router.push("/sign-up")} style={styles.linkWrap}>
+          <Pressable
+            onPress={() => router.push("/sign-up")}
+            style={styles.linkWrap}
+          >
             <Text style={styles.link}>Need an account? Sign up</Text>
-          </Pressable>
-
-          <Pressable onPress={() => router.back()} style={styles.linkWrap}>
-            <Text style={styles.muted}>Back</Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -125,9 +120,15 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
+  textCenter: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#111",
+    textAlign: "center",
+    marginBottom: 8,
+  },
   title: {
     fontSize: 28,
-    fontWeight: "bold",
     marginBottom: 20,
     color: "#111",
   },

@@ -273,7 +273,7 @@ export default function ReadingListDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+    <SafeAreaView style={styles.safe} edges={["top", "right", "bottom"]}>
       <View style={styles.pageCenter}>
         <View style={styles.toolbar}>
           <Pressable
