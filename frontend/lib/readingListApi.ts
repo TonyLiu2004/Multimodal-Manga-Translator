@@ -46,7 +46,7 @@ function authHeaders(accessToken: string): HeadersInit {
 }
 
 export async function fetchReadingLists(
-  accessToken: string
+  accessToken: string,
 ): Promise<ReadingListCollection[]> {
   const res = await fetch(`${BACKEND_URL}/reading-lists`, {
     headers: authHeaders(accessToken),
@@ -57,7 +57,7 @@ export async function fetchReadingLists(
 
 export async function createReadingList(
   accessToken: string,
-  name: string
+  name: string,
 ): Promise<ReadingListCollection> {
   const res = await fetch(`${BACKEND_URL}/reading-lists`, {
     method: "POST",
@@ -74,7 +74,7 @@ export async function createReadingList(
 export async function renameReadingList(
   accessToken: string,
   readingListId: number,
-  name: string
+  name: string,
 ): Promise<ReadingListCollection> {
   const res = await fetch(`${BACKEND_URL}/reading-lists/${readingListId}`, {
     method: "PATCH",
@@ -90,7 +90,7 @@ export async function renameReadingList(
 
 export async function deleteReadingList(
   accessToken: string,
-  readingListId: number
+  readingListId: number,
 ): Promise<void> {
   const res = await fetch(`${BACKEND_URL}/reading-lists/${readingListId}`, {
     method: "DELETE",
@@ -101,11 +101,11 @@ export async function deleteReadingList(
 
 export async function fetchReadingListItems(
   accessToken: string,
-  readingListId: number
+  readingListId: number,
 ): Promise<ReadingListItem[]> {
   const res = await fetch(
     `${BACKEND_URL}/reading-lists/${readingListId}/items`,
-    { headers: authHeaders(accessToken) }
+    { headers: authHeaders(accessToken) },
   );
   if (!res.ok) throw new Error(await readError(res));
   return res.json() as Promise<ReadingListItem[]>;
@@ -114,11 +114,11 @@ export async function fetchReadingListItems(
 export async function removeReadingListItem(
   accessToken: string,
   readingListId: number,
-  mangaId: number
+  mangaId: number,
 ): Promise<void> {
   const res = await fetch(
     `${BACKEND_URL}/reading-lists/${readingListId}/items/${mangaId}`,
-    { method: "DELETE", headers: authHeaders(accessToken) }
+    { method: "DELETE", headers: authHeaders(accessToken) },
   );
   if (!res.ok) throw new Error(await readError(res));
 }
@@ -129,7 +129,7 @@ export async function addToReadingList(
     readingListId: number;
     external_manga_id: string;
     manga_title: string;
-  }
+  },
 ): Promise<ReadingListItem> {
   const res = await fetch(
     `${BACKEND_URL}/reading-lists/${params.readingListId}/items`,
@@ -144,7 +144,7 @@ export async function addToReadingList(
         external_manga_id: params.external_manga_id,
         manga_title: params.manga_title,
       }),
-    }
+    },
   );
   if (!res.ok) throw new Error(await readError(res));
   return res.json() as Promise<ReadingListItem>;

@@ -258,6 +258,14 @@ async def proxy_manga_cover_art(manga_id: str, file_name: str, size: int = 256):
     print(url)
     return await proxy.get_manga_page_stream(url)
 
+
+@router.get("/api/manga/{manga_id}/cover")
+async def get_manga_cover_json(manga_id: str):
+    """MangaDex manga UUID → 256px cover URL for list UIs (no DB storage)."""
+    cover_url = await mangadex_service.get_manga_cover_url_256(manga_id)
+    return {"cover_url": cover_url}
+
+
 @router.get("/api/manga/search")
 async def get_popular_manga(
     title: str = "",

@@ -11,26 +11,6 @@ pip install fastapi "uvicorn[standard]"
 
 Or install all deps: `pip install -r requirements.txt`
 
-### Environment (reading lists / Supabase auth)
-
-| Variable | Purpose |
-|----------|---------|
-| `DATABASE_URL` | PostgreSQL for app data |
-| **Either** `SUPABASE_JWT_SECRET` **or** remote verification below | Verify the user’s `access_token` |
-
-**If your project no longer exposes a legacy JWT secret** (dashboard says to use signing keys / publishable keys), skip `SUPABASE_JWT_SECRET` and set:
-
-| Variable | Where to copy |
-|----------|----------------|
-| `SUPABASE_URL` | Same as frontend `EXPO_PUBLIC_SUPABASE_URL` (e.g. `https://xxxx.supabase.co`) |
-| `SUPABASE_ANON_KEY` | Same as frontend `EXPO_PUBLIC_SUPABASE_ANON_KEY` (anon / publishable key) |
-
-The API then calls `GET {SUPABASE_URL}/auth/v1/user` with the client’s Bearer token to validate it (no local JWT secret needed).
-
-If `SUPABASE_JWT_SECRET` is set, it is used first (offline verification; faster).
-
-See `backend/.env.example`.
-
 uvicorn is ASGI server, in production will need something like to use to start
 
 ```bash

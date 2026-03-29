@@ -5,6 +5,40 @@ import httpx
 
 BASE_URL = "https://api.mangadex.org"
 
+
+def _cover_url_from_manga_payload(data: dict, manga_id: str) -> str | None:
+    """Build 256px cover URL from MangaDex /manga/{id} JSON (needs cover_art relationship)."""
+    rels = data.get("relationships") or []
+    for rel in rels:
+        if rel.get("type") != "cover_art":
+            continue
+        attrs = rel.get("attributes") or {}
+        fn = attrs.get("fileName")
+        if isinstance(fn, str) and fn.strip():
+            return f"https://uploads.mangadex.org/covers/{manga_id}/{fn}.256.jpg"
+    return None
+
+
+async def get_manga_cover_url_256(manga_id: str) -> str | None:
+    """GET /manga/{id} with cover_art included; returns CDN URL or None."""
+    url = f"{BASE_URL}/manga/{manga_id}"
+    params = {"includes[]": ["cover_art"]}
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url, params=params, timeout=10.0)
+            response.raise_for_status()
+            payload = response.json()
+        except httpx.HTTPStatusError:
+            return None
+        except Exception as e:
+            print(f"get_manga_cover_url_256: {e}")
+            return None
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return None
+    return _cover_url_from_manga_payload(data, manga_id)
+
+
 async def search_manga(title: str, limit: int =20, offset: int = 0, order_by: str = "followedCount", order_direction: str = "desc", cover_art: bool = True):
     """
     Todo: filters by tags (include, exclude)
