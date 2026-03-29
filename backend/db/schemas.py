@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlmodel import SQLModel
+from sqlmodel import Field, SQLModel
 
 
 class MangaOut(SQLModel):
@@ -27,15 +27,43 @@ class ChapterListOut(SQLModel):
     updated_at: Optional[datetime] = None
 
 
-class ReadingListEntryOut(SQLModel):
-    """One saved umbrella manga on a user's reading list."""
+class ReadingListCollectionOut(SQLModel):
+    """A named reading list owned by the user."""
 
     id: int
-    user_id: uuid.UUID
-    manga_id: int
-    last_chapter_number: Optional[float] = None
+    name: str
+    manga_count: int = 0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+class ReadingListCollectionCreateIn(SQLModel):
+    name: str
+
+
+class ReadingListCollectionRenameIn(SQLModel):
+    name: str
+
+
+class ReadingListItemOut(SQLModel):
+    """One manga row inside a named list (with umbrella title + optional MangaDex id)."""
+
+    id: int
+    reading_list_id: int
+    manga_id: int
+    manga_title: str
+    external_manga_id: Optional[str] = None
+    last_chapter_number: Optional[float] = None
+    updated_at: Optional[datetime] = None
+
+
+class ReadingListAddIn(SQLModel):
+    """Add a title by provider catalog id (e.g. MangaDex UUID)."""
+
+    provider_id: str = Field(default="mangadex")
+    external_manga_id: str
+    manga_title: str
+    last_chapter_number: Optional[float] = None
 
 
 class SegmentListOut(SQLModel):

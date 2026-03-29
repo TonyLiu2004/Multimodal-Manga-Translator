@@ -19,7 +19,16 @@ except ImportError:
     pass
 
 # Import all models so they're registered with SQLModel.metadata
-from db.models import Manga, MangaSource, Chapters, Pages, Segments, Users, ReadingListEntry
+from db.models import (
+    Manga,
+    MangaSource,
+    Chapters,
+    Pages,
+    Segments,
+    Users,
+    ReadingListCollection,
+    ReadingListItem,
+)
 
 # context.config exists at runtime; Alembic's context stub omits it for static analysis.
 config: Config = getattr(context, "config")

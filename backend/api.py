@@ -3,7 +3,7 @@ Read-only API for the frontend. Wraps db list_entries, get_segments, get_chapter
 Run from backend:  uvicorn api:app --reload --host 0.0.0.0 --port 8000
 """
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import proxy
@@ -11,9 +11,19 @@ from services import mangadex_service
 from services.image_processor import ImageProcessor
 import httpx
 import db
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, text
 from db.models import Manga
-from db.schemas import ChapterListOut, SegmentListOut
+from auth_supabase import CurrentAuthContext, CurrentUserId
+from db.schemas import (
+    ChapterListOut,
+    ReadingListAddIn,
+    ReadingListCollectionCreateIn,
+    ReadingListCollectionOut,
+    ReadingListCollectionRenameIn,
+    ReadingListItemOut,
+    SegmentListOut,
+)
 
 # app = FastAPI(
 #     title="Manga Translator API",
@@ -111,6 +121,125 @@ def health():
     """Health check."""
     return {"status": "ok"}
 
+
+@router.get("/reading-lists", response_model=list[ReadingListCollectionOut])
+def get_reading_lists(user_id: CurrentUserId):
+    """List named reading lists for the signed-in user (with manga counts)."""
+    return db.list_reading_list_collections_with_counts(user_id)
+
+
+@router.post("/reading-lists", response_model=ReadingListCollectionOut)
+def post_reading_list_collection(
+    ctx: CurrentAuthContext, body: ReadingListCollectionCreateIn
+):
+    """Create a new named reading list."""
+    try:
+        col = db.create_reading_list_collection(
+            ctx.user_id, body.name, user_email=ctx.email
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except IntegrityError as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not create reading list (database constraint).",
+        ) from e
+    if col.id is None:
+        raise HTTPException(status_code=500, detail="Reading list id missing after save")
+    return ReadingListCollectionOut(
+        id=col.id,
+        name=col.name,
+        manga_count=0,
+        created_at=col.created_at,
+        updated_at=col.updated_at,
+    )
+
+
+@router.patch("/reading-lists/{reading_list_id}", response_model=ReadingListCollectionOut)
+def patch_reading_list_collection(
+    user_id: CurrentUserId,
+    reading_list_id: int,
+    body: ReadingListCollectionRenameIn,
+):
+    """Rename a reading list."""
+    try:
+        col = db.update_reading_list_collection(user_id, reading_list_id, body.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if col is None:
+        raise HTTPException(status_code=404, detail="Reading list not found")
+    counts = db.list_reading_list_collections_with_counts(user_id)
+    for c in counts:
+        if c.id == col.id:
+            return c
+    return ReadingListCollectionOut(
+        id=col.id,
+        name=col.name,
+        manga_count=0,
+        created_at=col.created_at,
+        updated_at=col.updated_at,
+    )
+
+
+@router.delete("/reading-lists/{reading_list_id}")
+def delete_reading_list_collection(user_id: CurrentUserId, reading_list_id: int):
+    """Delete a named list and all manga entries in it."""
+    ok = db.delete_reading_list_collection(user_id, reading_list_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Reading list not found")
+    return {"ok": True}
+
+
+@router.get("/reading-lists/{reading_list_id}/items", response_model=list[ReadingListItemOut])
+def get_reading_list_items(
+    user_id: CurrentUserId,
+    reading_list_id: int,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """Manga rows for one named list."""
+    if db.get_reading_list_collection(user_id, reading_list_id) is None:
+        raise HTTPException(status_code=404, detail="Reading list not found")
+    return db.list_reading_list_items_with_manga(
+        user_id, reading_list_id, limit=limit, offset=offset
+    )
+
+
+@router.post("/reading-lists/{reading_list_id}/items", response_model=ReadingListItemOut)
+def post_reading_list_item(
+    user_id: CurrentUserId, reading_list_id: int, body: ReadingListAddIn
+):
+    """Add or update a manga on a named list (by provider catalog id)."""
+    if db.get_reading_list_collection(user_id, reading_list_id) is None:
+        raise HTTPException(status_code=404, detail="Reading list not found")
+    try:
+        row = db.add_reading_list_item_by_source(
+            user_id,
+            reading_list_id,
+            body.provider_id,
+            body.external_manga_id,
+            body.manga_title,
+            last_chapter_number=body.last_chapter_number,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    items = db.list_reading_list_items_with_manga(user_id, reading_list_id, limit=500)
+    for it in items:
+        if it.id == row.id or it.manga_id == row.manga_id:
+            return it
+    raise HTTPException(status_code=500, detail="Item not found after save")
+
+
+@router.delete("/reading-lists/{reading_list_id}/items/{manga_id}")
+def delete_reading_list_item(
+    user_id: CurrentUserId, reading_list_id: int, manga_id: int
+):
+    """Remove one manga from a named list."""
+    ok = db.remove_reading_list_item_from_list(user_id, reading_list_id, manga_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Not on this reading list")
+    return {"ok": True}
+
 ###########
 ###########
 ###########
@@ -171,3 +300,26 @@ async def get_chapters(
         include_empty=includeEmptyPages
     )
     return results
+
+
+# Standalone ASGI app for `uvicorn api:app` (no ML / translation stack from main.py).
+app = FastAPI(
+    title="Manga Translator API",
+    description="Read endpoints for chapters and segments",
+    version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(router)
+
+
+@app.exception_handler(ValueError)
+def _value_error_handler(request, exc: ValueError):
+    return JSONResponse(status_code=400, content={"detail": str(exc)})

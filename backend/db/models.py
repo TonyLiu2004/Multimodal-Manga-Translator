@@ -21,7 +21,8 @@ Chapter table: chapter data scoped by provider (same umbrella manga can have cha
 
 Page / Segment tables: unchanged hierarchy under chapters
 
-ReadingListEntry: one row per user + umbrella manga (manga_id)
+ReadingListCollection: named list per user (e.g. "Want to read").
+ReadingListItem: one row per named list + umbrella manga (manga_id).
 """
 from datetime import datetime, timezone
 from typing import Optional
@@ -73,15 +74,30 @@ class MangaSource(SQLModel, table=True):
     created_at: Optional[datetime] = Field(default_factory=_utc_now)
 
 
-class ReadingListEntry(SQLModel, table=True):
-    __tablename__ = "reading_list"
+class ReadingListCollection(SQLModel, table=True):
+    """User-owned named reading list (container for manga)."""
+
+    __tablename__ = "reading_list_collection"
+    __table_args__ = ({"extend_existing": True},)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True)
+    name: str = Field(max_length=200)
+    created_at: Optional[datetime] = Field(default_factory=_utc_now)
+    updated_at: Optional[datetime] = Field(default_factory=_utc_now)
+
+
+class ReadingListItem(SQLModel, table=True):
+    """One umbrella manga inside a named reading list."""
+
+    __tablename__ = "reading_list_item"
     __table_args__ = (
-        UniqueConstraint("user_id", "manga_id", name="uq_reading_list_user_manga"),
+        UniqueConstraint("reading_list_id", "manga_id", name="uq_rli_list_manga"),
         {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: UUID = Field(foreign_key="users.id")
+    reading_list_id: int = Field(foreign_key="reading_list_collection.id", index=True)
     manga_id: int = Field(foreign_key="manga.id", index=True)
     last_chapter_number: Optional[float] = Field(default=None)
     created_at: Optional[datetime] = Field(default_factory=_utc_now)

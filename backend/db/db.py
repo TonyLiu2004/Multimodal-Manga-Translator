@@ -1,7 +1,7 @@
 """
 Database: SQL (PostgreSQL) via SQLModel.
 
-Schema: Users, reading_list; Manga → Chapters → Pages → Segments
+Schema: Users, reading_list_collection, reading_list_item; Manga → Chapters → Pages → Segments
 
 Utility Functions:
 
@@ -20,7 +20,7 @@ get_connection(db_url=None):
 
 init_db(db_url=None):
     Initializes the database schema by creating tables for all SQLModel models
-    (Users, ReadingListEntry, Manga, Chapters, Pages, Segments).
+    (Users, ReadingListCollection, ReadingListItem, Manga, Chapters, Pages, Segments).
 
 Other Core Database Functions:
 
@@ -48,12 +48,26 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from .const import PROVIDER_IDS, PROVIDER_LOCAL
-from .models import Manga, MangaSource, Chapters, Pages, Segments, ReadingListEntry
-from .schemas import ChapterListOut, SegmentListOut
+from .const import PROVIDER_IDS, PROVIDER_LOCAL, PROVIDER_MANGADEX
+from .models import (
+    Manga,
+    MangaSource,
+    Chapters,
+    Pages,
+    Segments,
+    ReadingListCollection,
+    ReadingListItem,
+    Users,
+)
+from .schemas import (
+    ChapterListOut,
+    ReadingListCollectionOut,
+    ReadingListItemOut,
+    SegmentListOut,
+)
 
 
 def _validate_provider_id(provider_id: str) -> None:
@@ -95,7 +109,7 @@ def get_connection(db_url=None):
 
 
 def init_db(db_url=None):
-    """Create tables: users, reading_list, manga, manga_source, chapters, pages, segments."""
+    """Create tables: users, reading_list_collection, reading_list_item, manga, manga_source, chapters, pages, segments."""
     engine = get_engine(db_url)
     SQLModel.metadata.create_all(engine)
 
@@ -336,8 +350,10 @@ def delete_all_manga(db_url=None) -> None:
             session.delete(p)
         for ch in session.exec(select(Chapters)).all():
             session.delete(ch)
-        for rl in session.exec(select(ReadingListEntry)).all():
-            session.delete(rl)
+        for rli in session.exec(select(ReadingListItem)).all():
+            session.delete(rli)
+        for rlc in session.exec(select(ReadingListCollection)).all():
+            session.delete(rlc)
         for ms in session.exec(select(MangaSource)).all():
             session.delete(ms)
         for m in session.exec(select(Manga)).all():
@@ -485,20 +501,219 @@ def list_mangas(
         return list(session.exec(stmt).all())
 
 
-def upsert_reading_list_entry(
+def _normalize_reading_list_name(name: str) -> str:
+    n = (name or "").strip()
+    if not n:
+        raise ValueError("Name is required")
+    if len(n) > 200:
+        raise ValueError("Name is too long")
+    return n
+
+
+def ensure_app_user(
+    user_id: UUID, email: Optional[str] = None, db_url=None
+) -> None:
+    """Ensure public.users has a row for this Supabase auth user (required for reading_list FK)."""
+    engine = get_engine(db_url)
+    now = datetime.now(timezone.utc)
+    with Session(engine) as session:
+        row = session.exec(select(Users).where(Users.id == user_id)).first()
+        if row is not None:
+            if email and row.email != email:
+                row.email = email
+                row.updated_at = now
+                session.add(row)
+                session.commit()
+            return
+        session.add(
+            Users(
+                id=user_id,
+                email=email,
+                display_name=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.commit()
+
+
+def get_reading_list_collection(
+    user_id: UUID, collection_id: int, db_url=None
+) -> Optional[ReadingListCollection]:
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        return session.exec(
+            select(ReadingListCollection).where(
+                ReadingListCollection.id == collection_id,
+                ReadingListCollection.user_id == user_id,
+            )
+        ).first()
+
+
+def create_reading_list_collection(
+    user_id: UUID, name: str, db_url=None, *, user_email: Optional[str] = None
+) -> ReadingListCollection:
+    ensure_app_user(user_id, email=user_email, db_url=db_url)
+    n = _normalize_reading_list_name(name)
+    now = datetime.now(timezone.utc)
+    col = ReadingListCollection(user_id=user_id, name=n, created_at=now, updated_at=now)
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        session.add(col)
+        session.commit()
+        session.refresh(col)
+        return col
+
+
+def update_reading_list_collection(
+    user_id: UUID, collection_id: int, name: str, db_url=None
+) -> Optional[ReadingListCollection]:
+    n = _normalize_reading_list_name(name)
+    engine = get_engine(db_url)
+    now = datetime.now(timezone.utc)
+    with Session(engine) as session:
+        col = session.exec(
+            select(ReadingListCollection).where(
+                ReadingListCollection.id == collection_id,
+                ReadingListCollection.user_id == user_id,
+            )
+        ).first()
+        if not col:
+            return None
+        col.name = n
+        col.updated_at = now
+        session.add(col)
+        session.commit()
+        session.refresh(col)
+        return col
+
+
+def delete_reading_list_collection(user_id: UUID, collection_id: int, db_url=None) -> bool:
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        col = session.exec(
+            select(ReadingListCollection).where(
+                ReadingListCollection.id == collection_id,
+                ReadingListCollection.user_id == user_id,
+            )
+        ).first()
+        if not col:
+            return False
+        for item in session.exec(
+            select(ReadingListItem).where(
+                ReadingListItem.reading_list_id == collection_id
+            )
+        ).all():
+            session.delete(item)
+        session.delete(col)
+        session.commit()
+        return True
+
+
+def list_reading_list_collections_with_counts(
+    user_id: UUID, db_url=None
+) -> list[ReadingListCollectionOut]:
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        cols = list(
+            session.exec(
+                select(ReadingListCollection)
+                .where(ReadingListCollection.user_id == user_id)
+                .order_by(desc(ReadingListCollection.updated_at))
+            ).all()
+        )
+        if not cols:
+            return []
+        ids = [c.id for c in cols if c.id is not None]
+        cnt_stmt = (
+            select(ReadingListItem.reading_list_id, func.count(ReadingListItem.id))
+            .where(ReadingListItem.reading_list_id.in_(ids))
+            .group_by(ReadingListItem.reading_list_id)
+        )
+        count_map = {rid: int(n) for rid, n in session.exec(cnt_stmt).all()}
+    return [
+        ReadingListCollectionOut(
+            id=c.id,
+            name=c.name,
+            created_at=c.created_at,
+            updated_at=c.updated_at,
+            manga_count=count_map.get(c.id, 0),
+        )
+        for c in cols
+    ]
+
+
+def list_reading_list_items_with_manga(
     user_id: UUID,
+    reading_list_id: int,
+    *,
+    db_url=None,
+    limit: Optional[int] = None,
+    offset: int = 0,
+) -> list[ReadingListItemOut]:
+    if get_reading_list_collection(user_id, reading_list_id, db_url) is None:
+        return []
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        stmt = (
+            select(ReadingListItem, Manga, MangaSource)
+            .join(Manga, ReadingListItem.manga_id == Manga.id)
+            .outerjoin(
+                MangaSource,
+                (MangaSource.manga_id == Manga.id)
+                & (MangaSource.provider_id == PROVIDER_MANGADEX),
+            )
+            .where(ReadingListItem.reading_list_id == reading_list_id)
+            .order_by(desc(ReadingListItem.updated_at))
+        )
+        if offset > 0:
+            stmt = stmt.offset(offset)
+        if limit is not None and limit > 0:
+            stmt = stmt.limit(limit)
+        rows = session.exec(stmt).all()
+    out: list[ReadingListItemOut] = []
+    for item, manga, src in rows:
+        ext = None
+        if src and src.external_manga_id and not _is_placeholder_external_manga_id(
+            src.external_manga_id
+        ):
+            ext = src.external_manga_id
+        out.append(
+            ReadingListItemOut(
+                id=item.id,
+                reading_list_id=reading_list_id,
+                manga_id=manga.id,
+                manga_title=manga.manga_title,
+                external_manga_id=ext,
+                last_chapter_number=item.last_chapter_number,
+                updated_at=item.updated_at,
+            )
+        )
+    return out
+
+
+def upsert_reading_list_item(
+    user_id: UUID,
+    reading_list_id: int,
     manga_id: int,
     *,
     last_chapter_number: Optional[float] = None,
     db_url=None,
-) -> ReadingListEntry:
-    """Add or update a reading-list row for (user_id, manga_id)."""
+) -> ReadingListItem:
     engine = get_engine(db_url)
     now = datetime.now(timezone.utc)
     with Session(engine) as session:
-        stmt = select(ReadingListEntry).where(
-            ReadingListEntry.user_id == user_id,
-            ReadingListEntry.manga_id == manga_id,
+        col = session.exec(
+            select(ReadingListCollection).where(
+                ReadingListCollection.id == reading_list_id,
+                ReadingListCollection.user_id == user_id,
+            )
+        ).first()
+        if not col:
+            raise ValueError("Reading list not found")
+        stmt = select(ReadingListItem).where(
+            ReadingListItem.reading_list_id == reading_list_id,
+            ReadingListItem.manga_id == manga_id,
         )
         row = session.exec(stmt).first()
         if row:
@@ -506,55 +721,77 @@ def upsert_reading_list_entry(
                 row.last_chapter_number = last_chapter_number
             row.updated_at = now
             session.add(row)
+            col.updated_at = now
+            session.add(col)
             session.commit()
             session.refresh(row)
             return row
-        entry = ReadingListEntry(
-            user_id=user_id,
+        entry = ReadingListItem(
+            reading_list_id=reading_list_id,
             manga_id=manga_id,
             last_chapter_number=last_chapter_number,
             created_at=now,
             updated_at=now,
         )
         session.add(entry)
+        col.updated_at = now
+        session.add(col)
         session.commit()
         session.refresh(entry)
         return entry
 
 
-def remove_reading_list_entry(user_id: UUID, manga_id: int, db_url=None) -> bool:
-    """Remove one reading-list row; returns True if a row was deleted."""
+def remove_reading_list_item_from_list(
+    user_id: UUID, reading_list_id: int, manga_id: int, db_url=None
+) -> bool:
     engine = get_engine(db_url)
+    now = datetime.now(timezone.utc)
     with Session(engine) as session:
-        stmt = select(ReadingListEntry).where(
-            ReadingListEntry.user_id == user_id,
-            ReadingListEntry.manga_id == manga_id,
+        col = session.exec(
+            select(ReadingListCollection).where(
+                ReadingListCollection.id == reading_list_id,
+                ReadingListCollection.user_id == user_id,
+            )
+        ).first()
+        if not col:
+            return False
+        stmt = select(ReadingListItem).where(
+            ReadingListItem.reading_list_id == reading_list_id,
+            ReadingListItem.manga_id == manga_id,
         )
         row = session.exec(stmt).first()
         if not row:
             return False
         session.delete(row)
+        col.updated_at = now
+        session.add(col)
         session.commit()
         return True
 
 
-def list_reading_list_entries(
+def add_reading_list_item_by_source(
     user_id: UUID,
+    reading_list_id: int,
+    provider_id: str,
+    external_manga_id: str,
+    manga_title: str,
     *,
+    last_chapter_number: Optional[float] = None,
     db_url=None,
-    limit: Optional[int] = None,
-    offset: int = 0,
-) -> list[ReadingListEntry]:
-    """List reading-list rows for a user, newest updates first."""
+) -> ReadingListItem:
+    _validate_provider_id(provider_id)
+    ext = (external_manga_id or "").strip()
+    title = (manga_title or "").strip() or "Untitled"
+    if not ext:
+        raise ValueError("external_manga_id is required")
     engine = get_engine(db_url)
     with Session(engine) as session:
-        stmt = (
-            select(ReadingListEntry)
-            .where(ReadingListEntry.user_id == user_id)
-            .order_by(desc(ReadingListEntry.updated_at))
-        )
-        if offset > 0:
-            stmt = stmt.offset(offset)
-        if limit is not None and limit > 0:
-            stmt = stmt.limit(limit)
-        return list(session.exec(stmt).all())
+        manga_id = resolve_manga_id(session, provider_id, title, ext)
+        session.commit()
+    return upsert_reading_list_item(
+        user_id,
+        reading_list_id,
+        manga_id,
+        last_chapter_number=last_chapter_number,
+        db_url=db_url,
+    )

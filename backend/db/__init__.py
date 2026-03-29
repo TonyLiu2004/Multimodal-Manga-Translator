@@ -2,12 +2,19 @@
     import like this: from db
     import init_db,
     Users,
-    ReadingListEntry,
+    ReadingListCollection,
+    ReadingListItem,
     MangaSource,
     resolve_manga_id_by_source,
-    upsert_reading_list_entry,
-    remove_reading_list_entry,
-    list_reading_list_entries,
+    get_reading_list_collection,
+    create_reading_list_collection,
+    update_reading_list_collection,
+    delete_reading_list_collection,
+    list_reading_list_collections_with_counts,
+    list_reading_list_items_with_manga,
+    upsert_reading_list_item,
+    remove_reading_list_item_from_list,
+    add_reading_list_item_by_source,
     save_page_translation,
     get_segments,
     get_chapter_segments,
@@ -18,13 +25,19 @@
     get_engine
 """
 from .const import PROVIDER_IDS, PROVIDER_LOCAL, PROVIDER_MANGADEX
-from .models import Users, ReadingListEntry, MangaSource
+from .models import Users, ReadingListCollection, ReadingListItem, MangaSource
 from .db import (
     init_db,
     resolve_manga_id_by_source,
-    upsert_reading_list_entry,
-    remove_reading_list_entry,
-    list_reading_list_entries,
+    get_reading_list_collection,
+    create_reading_list_collection,
+    update_reading_list_collection,
+    delete_reading_list_collection,
+    list_reading_list_collections_with_counts,
+    list_reading_list_items_with_manga,
+    upsert_reading_list_item,
+    remove_reading_list_item_from_list,
+    add_reading_list_item_by_source,
     save_page_translation,
     get_segments,
     get_chapter_segments,
