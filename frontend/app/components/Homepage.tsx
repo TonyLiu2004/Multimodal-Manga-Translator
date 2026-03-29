@@ -1,14 +1,12 @@
-import { 
-  Text,
-  ScrollView,
-  StyleSheet,
-} from "react-native";
+import { Text, ScrollView, StyleSheet, Pressable, View } from "react-native";
 import React, { useEffect, useState } from "react";
 import MangaCarousel from "./MangaCarousel";
 import MangaCategoryList from "./MangaCategoryList";
-import { Manga} from "../types/types";
+import { Manga } from "../types/types";
 import SearchBar from "./SearchBar";
 import { useRouter } from "expo-router";
+import { useAuth } from "@/context/AuthContext";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 import { BACKEND_URL } from "../config";
 
@@ -18,6 +16,7 @@ export default function Index() {
   const [recentManga, setRecentManga] = useState<Manga[]>([]);
   const [actionManga, setActionManga] = useState<Manga[]>([]);
   const [romanceManga, setRomanceManga] = useState<Manga[]>([]);
+  const { session, loading: authLoading, userLabel, signOut } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -72,7 +71,7 @@ export default function Index() {
     if (searchQuery.trim()) {
       (router as any).push(`/search?query=${encodeURIComponent(searchQuery)}`);
     }
-  }
+  };
 
   return (
     <ScrollView
@@ -82,6 +81,43 @@ export default function Index() {
         padding: 20,
       }}
     >
+      <View style={styles.headerRow}>
+        {authLoading && isSupabaseConfigured() ? (
+          <View style={styles.authRowPlaceholder} />
+        ) : !session ? (
+          <View style={styles.authRow}>
+            <Pressable onPress={() => router.push("/sign-in")}>
+              <Text style={styles.authLink}>Sign in</Text>
+            </Pressable>
+            <Text style={styles.authSep}>·</Text>
+            <Pressable onPress={() => router.push("/sign-up")}>
+              <Text style={styles.authLink}>Sign up</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.authRow}>
+            <Pressable
+              onPress={() => router.push("/profile")}
+              style={({ pressed }) => [
+                styles.userLabelPressable,
+                pressed && styles.userLabelPressed,
+              ]}
+            >
+              <Text
+                style={styles.userLabel}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {userLabel}
+              </Text>
+            </Pressable>
+            <Text style={styles.authSep}>·</Text>
+            <Pressable onPress={() => void signOut()}>
+              <Text style={styles.signOut}>Sign out</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
       <Text style={styles.h1}>Manglify</Text>
 
       <SearchBar
@@ -93,21 +129,11 @@ export default function Index() {
 
       <MangaCarousel data={popularManga} />
 
-      <MangaCategoryList
-        title="Recently Updated"
-        data={recentManga}
-      />
+      <MangaCategoryList title="Recently Updated" data={recentManga} />
 
-      <MangaCategoryList
-        title="Action"
-        data={actionManga}
-      />
+      <MangaCategoryList title="Action" data={actionManga} />
 
-      <MangaCategoryList
-        title="Romance"
-        data={romanceManga}
-      />
-
+      <MangaCategoryList title="Romance" data={romanceManga} />
     </ScrollView>
   );
 }
@@ -116,7 +142,52 @@ const styles = StyleSheet.create({
   h1: {
     fontSize: 32,
     fontWeight: "bold",
-    marginVertical: 10,
+    flexShrink: 1,
+  },
+  headerRow: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 12,
+  },
+  authRowPlaceholder: {
+    minHeight: 22,
+    marginBottom: 8,
+  },
+  authRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+    maxWidth: "100%",
+    flexShrink: 1,
+    justifyContent: "flex-end",
+  },
+  userLabelPressable: {
+    flexShrink: 1,
+    maxWidth: 200,
+  },
+  userLabelPressed: {
+    opacity: 0.65,
+  },
+  userLabel: {
+    fontSize: 15,
+    color: "#1565c0",
+    flexShrink: 1,
+  },
+  authLink: {
+    fontSize: 15,
+    color: "#1565c0",
+  },
+  authSep: {
+    fontSize: 15,
+    color: "#999",
+  },
+  signOut: {
+    fontSize: 15,
+    color: "#666",
   },
   input: {
     height: 50,

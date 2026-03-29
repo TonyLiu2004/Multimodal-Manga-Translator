@@ -1,8 +1,14 @@
 import { useRouter } from "expo-router";
 import { Modal, Text, ScrollView, View, StyleSheet, Pressable, Image, ActivityIndicator } from "react-native";
 import React from 'react';
-import { Chapter } from "../types/types";
-import { Manga } from "../types/types";
+import { Chapter, Manga } from "../types/types";
+import { useAuth } from "@/context/AuthContext";
+import {
+    addToReadingList,
+    createReadingList,
+    fetchReadingLists,
+    type ReadingListCollection,
+} from "@/lib/readingListApi";
 
 interface PopUpProps {
     visible: boolean;
@@ -18,6 +24,50 @@ interface PopUpProps {
 export default function PopUp({ visible, title, summary, coverArt, chapters, loadingChapters, manga, onClose }: PopUpProps) {
 
     const router = useRouter();
+    const { session } = useAuth();
+    const [listBusy, setListBusy] = React.useState(false);
+    const [listMsg, setListMsg] = React.useState<string | null>(null);
+    const [readingLists, setReadingLists] = React.useState<ReadingListCollection[]>([]);
+    const [listsLoading, setListsLoading] = React.useState(false);
+    const [selectedListId, setSelectedListId] = React.useState<number | null>(null);
+
+    React.useEffect(() => {
+        if (visible) {
+            setListMsg(null);
+            setListBusy(false);
+        }
+    }, [visible, manga.id]);
+
+    React.useEffect(() => {
+        if (!visible || !session?.access_token) return;
+        let cancelled = false;
+        (async () => {
+            setListsLoading(true);
+            try {
+                let cols = await fetchReadingLists(session.access_token);
+                if (!cancelled && cols.length === 0) {
+                    await createReadingList(session.access_token, "My list");
+                    cols = await fetchReadingLists(session.access_token);
+                }
+                if (cancelled) return;
+                setReadingLists(cols);
+                setSelectedListId((prev) => {
+                    if (prev != null && cols.some((c) => c.id === prev)) return prev;
+                    return cols[0]?.id ?? null;
+                });
+            } catch {
+                if (!cancelled) {
+                    setReadingLists([]);
+                    setSelectedListId(null);
+                }
+            } finally {
+                if (!cancelled) setListsLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [visible, session?.access_token]);
 
     const [selectedLanguage, setSelectedLanguage] = React.useState<string>('All');
     const filteredChapters = chapters.filter(ch => 
@@ -51,6 +101,85 @@ export default function PopUp({ visible, title, summary, coverArt, chapters, loa
                         />
                         <Text style={styles.title}>{title}</Text>
                         <Text style={styles.summary}>{summary}</Text>
+
+                        {session?.access_token ? (
+                            <View style={styles.readingListBlock}>
+                                <Text style={styles.listPickerLabel}>Add to list</Text>
+                                {listsLoading ? (
+                                    <ActivityIndicator size="small" color="#111" style={styles.listsSpinner} />
+                                ) : readingLists.length === 0 ? (
+                                    <Text style={styles.listHint}>
+                                        Create a reading list in Profile, then try again.
+                                    </Text>
+                                ) : (
+                                    <View style={styles.listChipsWrap}>
+                                        {readingLists.map((c) => (
+                                            <Pressable
+                                                key={c.id}
+                                                style={[
+                                                    styles.listChip,
+                                                    selectedListId === c.id && styles.listChipActive,
+                                                ]}
+                                                onPress={() => setSelectedListId(c.id)}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.listChipText,
+                                                        selectedListId === c.id && styles.listChipTextActive,
+                                                    ]}
+                                                    numberOfLines={1}
+                                                >
+                                                    {c.name}
+                                                </Text>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+                                )}
+                                <Pressable
+                                    style={[
+                                        styles.addListBtn,
+                                        (listBusy || selectedListId == null || listsLoading) &&
+                                            styles.addListBtnDisabled,
+                                    ]}
+                                    onPress={async () => {
+                                        if (!session.access_token || selectedListId == null) return;
+                                        setListMsg(null);
+                                        setListBusy(true);
+                                        try {
+                                            await addToReadingList(session.access_token, {
+                                                readingListId: selectedListId,
+                                                external_manga_id: manga.id,
+                                                manga_title: title,
+                                            });
+                                            setListMsg("Added to the selected list.");
+                                        } catch (e) {
+                                            setListMsg(
+                                                e instanceof Error ? e.message : "Could not add to list."
+                                            );
+                                        } finally {
+                                            setListBusy(false);
+                                        }
+                                    }}
+                                    disabled={listBusy || selectedListId == null || listsLoading}
+                                >
+                                    {listBusy ? (
+                                        <ActivityIndicator color="#fff" />
+                                    ) : (
+                                        <Text style={styles.addListBtnText}>Add to selected list</Text>
+                                    )}
+                                </Pressable>
+                                {listMsg ? (
+                                    <Text
+                                        style={[
+                                            styles.listMsg,
+                                            listMsg.startsWith("Added") ? styles.listMsgOk : styles.listMsgErr,
+                                        ]}
+                                    >
+                                        {listMsg}
+                                    </Text>
+                                ) : null}
+                            </View>
+                        ) : null}
                         
                         <View style={styles.chaptersSection}>
                             <Text style={styles.chaptersTitle}>Chapters</Text>
@@ -146,6 +275,78 @@ const styles = StyleSheet.create({
         lineHeight: 24,
         color: '#666',
         marginBottom: 20,
+    },
+    readingListBlock: {
+        marginBottom: 16,
+    },
+    listPickerLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#444',
+        marginBottom: 8,
+    },
+    listsSpinner: {
+        alignSelf: 'flex-start',
+        marginBottom: 10,
+    },
+    listHint: {
+        fontSize: 13,
+        color: '#888',
+        marginBottom: 10,
+        lineHeight: 18,
+    },
+    listChipsWrap: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 12,
+    },
+    listChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#F0F0F0',
+        borderWidth: 1,
+        borderColor: '#DDD',
+        maxWidth: '100%',
+    },
+    listChipActive: {
+        backgroundColor: '#111',
+        borderColor: '#111',
+    },
+    listChipText: {
+        fontSize: 13,
+        color: '#333',
+        fontWeight: '500',
+        maxWidth: 200,
+    },
+    listChipTextActive: {
+        color: '#FFF',
+    },
+    addListBtn: {
+        backgroundColor: '#111',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    addListBtnDisabled: {
+        opacity: 0.6,
+    },
+    addListBtnText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    listMsg: {
+        marginTop: 8,
+        fontSize: 13,
+    },
+    listMsgOk: {
+        color: '#2e7d32',
+    },
+    listMsgErr: {
+        color: '#c62828',
     },
     chaptersSection: {
         marginTop: 20,
