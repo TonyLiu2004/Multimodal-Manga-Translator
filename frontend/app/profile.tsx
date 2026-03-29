@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -20,43 +19,10 @@ import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   createReadingList,
   deleteReadingList,
-  fetchReadingListItems,
   fetchReadingLists,
-  removeReadingListItem,
   renameReadingList,
   type ReadingListCollection,
-  type ReadingListItem,
 } from "@/lib/readingListApi";
-import { fetchMangaCoverUrl } from "@/lib/mangaCoverApi";
-
-const COVER_PLACEHOLDER =
-  "https://via.placeholder.com/128x180?text=No+Cover";
-
-async function hydrateMangaCovers(
-  items: ReadingListItem[],
-  setCoverUrls: React.Dispatch<
-    React.SetStateAction<Record<string, string | null>>
-  >,
-) {
-  const extIds = [
-    ...new Set(
-      items.map((i) => i.external_manga_id).filter(Boolean),
-    ),
-  ] as string[];
-  setCoverUrls((prev) => {
-    const need = extIds.filter((id) => !(id in prev));
-    if (need.length === 0) return prev;
-    void (async () => {
-      const results = Object.fromEntries(
-        await Promise.all(
-          need.map(async (id) => [id, await fetchMangaCoverUrl(id)] as const),
-        ),
-      ) as Record<string, string | null>;
-      setCoverUrls((p) => ({ ...p, ...results }));
-    })();
-    return prev;
-  });
-}
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -67,21 +33,9 @@ export default function ProfileScreen() {
   const [saved, setSaved] = useState(false);
 
   const [collections, setCollections] = useState<ReadingListCollection[]>([]);
-  /** Undefined = items not loaded yet (list collapsed or never opened). */
-  const [itemsByListId, setItemsByListId] = useState<
-    Record<number, ReadingListItem[] | undefined>
-  >({});
-  const [expandedByListId, setExpandedByListId] = useState<
-    Record<number, boolean>
-  >({});
-  const [itemsLoadingByListId, setItemsLoadingByListId] = useState<
-    Record<number, boolean>
-  >({});
-  const [coverUrls, setCoverUrls] = useState<Record<string, string | null>>({});
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [newListName, setNewListName] = useState("");
   const [creatingList, setCreatingList] = useState(false);
   const [editingListId, setEditingListId] = useState<number | null>(null);
@@ -95,63 +49,15 @@ export default function ProfileScreen() {
     try {
       const cols = await fetchReadingLists(session.access_token);
       setCollections(cols);
-      setItemsByListId({});
-      setExpandedByListId({});
-      setItemsLoadingByListId({});
     } catch (e) {
       setListError(
         e instanceof Error ? e.message : "Could not load reading lists.",
       );
       setCollections([]);
-      setItemsByListId({});
-      setExpandedByListId({});
     } finally {
       setListLoading(false);
     }
   }, [session?.access_token]);
-
-  const loadListItems = useCallback(
-    async (listId: number) => {
-      if (!session?.access_token) return;
-      setItemsLoadingByListId((prev) => ({ ...prev, [listId]: true }));
-      setListError(null);
-      try {
-        const items = await fetchReadingListItems(
-          session.access_token,
-          listId,
-        );
-        setItemsByListId((prev) => ({ ...prev, [listId]: items }));
-        await hydrateMangaCovers(items, setCoverUrls);
-      } catch (e) {
-        setListError(
-          e instanceof Error ? e.message : "Could not load list items.",
-        );
-      } finally {
-        setItemsLoadingByListId((prev) => ({ ...prev, [listId]: false }));
-      }
-    },
-    [session?.access_token],
-  );
-
-  const toggleListExpanded = useCallback(
-    (listId: number) => {
-      setExpandedByListId((prev) => {
-        const nextOpen = !prev[listId];
-        if (nextOpen) {
-          queueMicrotask(() => {
-            setItemsByListId((itemsPrev) => {
-              if (itemsPrev[listId] === undefined) {
-                void loadListItems(listId);
-              }
-              return itemsPrev;
-            });
-          });
-        }
-        return { ...prev, [listId]: nextOpen };
-      });
-    },
-    [loadListItems],
-  );
 
   useEffect(() => {
     if (authLoading || !session?.access_token) return;
@@ -229,53 +135,11 @@ export default function ProfileScreen() {
     try {
       await deleteReadingList(session.access_token, listId);
       setCollections((prev) => prev.filter((c) => c.id !== listId));
-      setItemsByListId((prev) => {
-        const next = { ...prev };
-        delete next[listId];
-        return next;
-      });
-      setExpandedByListId((prev) => {
-        const next = { ...prev };
-        delete next[listId];
-        return next;
-      });
-      setItemsLoadingByListId((prev) => {
-        const next = { ...prev };
-        delete next[listId];
-        return next;
-      });
       if (editingListId === listId) setEditingListId(null);
     } catch (e) {
       setListError(
         e instanceof Error ? e.message : "Could not delete reading list.",
       );
-    }
-  };
-
-  const onRemoveItem = async (listId: number, mangaId: number) => {
-    if (!session?.access_token) return;
-    const key = `${listId}-${mangaId}`;
-    setRemovingKey(key);
-    setListError(null);
-    try {
-      await removeReadingListItem(session.access_token, listId, mangaId);
-      setItemsByListId((prev) => ({
-        ...prev,
-        [listId]: (prev[listId] ?? []).filter((x) => x.manga_id !== mangaId),
-      }));
-      setCollections((prev) =>
-        prev.map((c) =>
-          c.id === listId
-            ? { ...c, manga_count: Math.max(0, c.manga_count - 1) }
-            : c,
-        ),
-      );
-    } catch (e) {
-      setListError(
-        e instanceof Error ? e.message : "Could not remove from list.",
-      );
-    } finally {
-      setRemovingKey(null);
     }
   };
 
@@ -341,6 +205,7 @@ export default function ProfileScreen() {
             />
           }
         >
+          <View style={styles.contentColumn}>
           <Text style={styles.title}>Profile</Text>
           <Text style={styles.emailLine}>{session.user.email}</Text>
 
@@ -380,8 +245,8 @@ export default function ProfileScreen() {
           <View style={styles.listsSectionHeader}>
             <Text style={styles.sectionTitle}>Reading lists</Text>
             <Text style={styles.sectionHint}>
-              Tap a list to see titles. Add manga from search or the home
-              carousel.
+              Open a list to view titles and manage items. Add manga from
+              search or the home carousel.
             </Text>
           </View>
 
@@ -439,12 +304,8 @@ export default function ProfileScreen() {
 
           {collections.map((c) => {
             const isEditing = editingListId === c.id;
-            const expanded = !!expandedByListId[c.id];
-            const itemsLoading = !!itemsLoadingByListId[c.id];
-            const items = itemsByListId[c.id];
-            const itemsLoaded = items !== undefined;
             return (
-              <View key={c.id} style={styles.listCard}>
+              <View key={c.id} style={styles.collectionCard}>
                 <View style={styles.listCardHeader}>
                   {isEditing ? (
                     <View style={styles.renameRow}>
@@ -453,32 +314,46 @@ export default function ProfileScreen() {
                         value={editNameDraft}
                         onChangeText={setEditNameDraft}
                         autoFocus
+                        placeholderTextColor="#9ca3af"
                       />
-                      <Pressable
-                        style={styles.smallBtn}
-                        onPress={() => void onSaveRename(c.id)}
-                        disabled={savingRename || !editNameDraft.trim()}
-                      >
-                        <Text style={styles.smallBtnText}>Save</Text>
-                      </Pressable>
-                      <Pressable
-                        style={styles.smallBtnMuted}
-                        onPress={() => setEditingListId(null)}
-                      >
-                        <Text style={styles.smallBtnMutedText}>Cancel</Text>
-                      </Pressable>
+                      <View style={styles.renameActions}>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.smallBtn,
+                            pressed && styles.smallBtnPressed,
+                          ]}
+                          onPress={() => void onSaveRename(c.id)}
+                          disabled={savingRename || !editNameDraft.trim()}
+                        >
+                          <Text style={styles.smallBtnText}>Save</Text>
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.smallBtnGhost,
+                            pressed && styles.smallBtnGhostPressed,
+                          ]}
+                          onPress={() => setEditingListId(null)}
+                        >
+                          <Text style={styles.smallBtnGhostText}>Cancel</Text>
+                        </Pressable>
+                      </View>
                     </View>
                   ) : (
                     <Pressable
-                      style={styles.listHeaderPressable}
-                      onPress={() => toggleListExpanded(c.id)}
+                      style={({ pressed }) => [
+                        styles.listOpenPressable,
+                        pressed && styles.listOpenPressed,
+                      ]}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/reading-list/[id]",
+                          params: { id: String(c.id), title: c.name },
+                        })
+                      }
                       accessibilityRole="button"
-                      accessibilityLabel={`${expanded ? "Collapse" : "Expand"} list ${c.name}`}
+                      accessibilityLabel={`Open reading list ${c.name}`}
                     >
                       <View style={styles.listHeaderRow}>
-                        <Text style={styles.listChevron}>
-                          {expanded ? "▼" : "▶"}
-                        </Text>
                         <View style={styles.listHeaderTitles}>
                           <Text style={styles.listCardTitle} numberOfLines={2}>
                             {c.name}
@@ -488,6 +363,12 @@ export default function ProfileScreen() {
                             {c.manga_count === 1 ? "" : "s"}
                           </Text>
                         </View>
+                        <View style={styles.countPill}>
+                          <Text style={styles.countPillText}>
+                            {c.manga_count}
+                          </Text>
+                        </View>
+                        <Text style={styles.openArrow}>→</Text>
                       </View>
                     </Pressable>
                   )}
@@ -495,6 +376,7 @@ export default function ProfileScreen() {
                 {!isEditing ? (
                   <View style={styles.listCardActions}>
                     <Pressable
+                      style={({ pressed }) => pressed && styles.textLinkPressed}
                       onPress={() => {
                         setEditingListId(c.id);
                         setEditNameDraft(c.name);
@@ -503,252 +385,318 @@ export default function ProfileScreen() {
                       <Text style={styles.linkAction}>Rename</Text>
                     </Pressable>
                     <Text style={styles.actionSep}>·</Text>
-                    <Pressable onPress={() => confirmDeleteList(c)}>
-                      <Text style={styles.dangerAction}>Delete list</Text>
+                    <Pressable
+                      style={({ pressed }) => pressed && styles.textLinkPressed}
+                      onPress={() => confirmDeleteList(c)}
+                    >
+                      <Text style={styles.dangerAction}>Delete</Text>
                     </Pressable>
                   </View>
-                ) : null}
-
-                {expanded && !isEditing ? (
-                  <>
-                    {itemsLoading ? (
-                      <ActivityIndicator
-                        style={styles.listItemsSpinner}
-                        color="#111"
-                      />
-                    ) : null}
-                    {!itemsLoading && itemsLoaded
-                      ? (items as ReadingListItem[]).map((item) => {
-                          const rk = `${c.id}-${item.manga_id}`;
-                          const extId = item.external_manga_id;
-                          const resolvedCover =
-                            extId != null && extId !== ""
-                              ? coverUrls[extId]
-                              : null;
-                          const coverUri =
-                            resolvedCover ?? COVER_PLACEHOLDER;
-                          return (
-                            <View key={item.id} style={styles.listRow}>
-                              <Image
-                                source={{ uri: coverUri }}
-                                style={styles.listRowThumb}
-                              />
-                              <View style={styles.listRowText}>
-                                <Text
-                                  style={styles.listTitle}
-                                  numberOfLines={2}
-                                >
-                                  {item.manga_title}
-                                </Text>
-                                {item.last_chapter_number != null ? (
-                                  <Text style={styles.listMeta}>
-                                    Last read: Ch.{" "}
-                                    {item.last_chapter_number}
-                                  </Text>
-                                ) : null}
-                              </View>
-                              <Pressable
-                                style={styles.removeBtn}
-                                onPress={() =>
-                                  void onRemoveItem(c.id, item.manga_id)
-                                }
-                                disabled={removingKey === rk}
-                              >
-                                {removingKey === rk ? (
-                                  <ActivityIndicator
-                                    size="small"
-                                    color="#c62828"
-                                  />
-                                ) : (
-                                  <Text style={styles.removeBtnText}>
-                                    Remove
-                                  </Text>
-                                )}
-                              </Pressable>
-                            </View>
-                          );
-                        })
-                      : null}
-                    {!itemsLoading &&
-                    itemsLoaded &&
-                    (items as ReadingListItem[]).length === 0 ? (
-                      <Text style={styles.emptyItems}>
-                        No manga in this list.
-                      </Text>
-                    ) : null}
-                  </>
                 ) : null}
               </View>
             );
           })}
 
-          <Pressable onPress={() => router.back()} style={styles.linkWrap}>
-            <Text style={styles.muted}>Back</Text>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [
+              styles.backLink,
+              pressed && styles.backLinkPressed,
+            ]}
+          >
+            <Text style={styles.backLinkText}>← Back</Text>
           </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
+const cardShadow = Platform.select({
+  ios: {
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+  },
+  android: { elevation: 3 },
+  default: {},
+});
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff" },
+  safe: { flex: 1, backgroundColor: "#f3f4f6" },
   flex: { flex: 1 },
   loader: { marginTop: 40 },
   scroll: {
-    padding: 24,
-    alignItems: "stretch",
-    maxWidth: 420,
+    paddingVertical: 24,
+    paddingBottom: 40,
+    alignItems: "center",
+  },
+  contentColumn: {
     width: "100%",
-    alignSelf: "center",
+    maxWidth: 440,
+    alignItems: "center",
+    paddingHorizontal: 24,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 8,
-    color: "#111",
+    fontSize: 30,
+    fontWeight: "800",
+    marginBottom: 6,
+    color: "#111827",
+    letterSpacing: -0.5,
+    textAlign: "center",
+    alignSelf: "stretch",
   },
   emailLine: {
     fontSize: 14,
-    color: "#666",
-    marginBottom: 24,
+    color: "#6b7280",
+    marginBottom: 22,
+    textAlign: "center",
+    alignSelf: "stretch",
+  },
+  profileCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    ...cardShadow,
+    alignSelf: "stretch",
+    width: "100%",
   },
   fieldLabel: {
-    fontSize: 14,
-    color: "#333",
+    fontSize: 13,
+    color: "#4b5563",
     marginBottom: 8,
-    fontWeight: "500",
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    textAlign: "center",
   },
   input: {
     height: 50,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 10,
-    paddingHorizontal: 15,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    paddingHorizontal: 16,
     fontSize: 16,
-    color: "#333",
-    backgroundColor: "#FAFAFA",
+    color: "#111827",
+    backgroundColor: "#f9fafb",
     marginBottom: 12,
   },
-  error: { color: "#c62828", marginBottom: 8, fontSize: 14 },
-  success: { color: "#2e7d32", marginBottom: 8, fontSize: 14 },
+  error: {
+    color: "#b91c1c",
+    marginBottom: 8,
+    fontSize: 14,
+    textAlign: "center",
+    alignSelf: "stretch",
+  },
+  success: {
+    color: "#15803d",
+    marginBottom: 8,
+    fontSize: 14,
+    textAlign: "center",
+    alignSelf: "stretch",
+  },
   button: {
-    backgroundColor: "#111",
+    backgroundColor: "#111827",
     height: 50,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    marginTop: 4,
+    alignSelf: "stretch",
   },
-  buttonDisabled: { opacity: 0.6 },
+  buttonPressed: { opacity: 0.88 },
+  buttonDisabled: { opacity: 0.55 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  linkWrap: { marginTop: 20, alignItems: "center" },
-  muted: { fontSize: 14, color: "#888" },
+  listsSectionHeader: {
+    marginTop: 26,
+    marginBottom: 4,
+    alignSelf: "stretch",
+  },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#111",
-    marginTop: 28,
+    fontWeight: "800",
+    color: "#111827",
     marginBottom: 6,
+    letterSpacing: -0.3,
+    textAlign: "center",
   },
   sectionHint: {
     fontSize: 13,
-    color: "#777",
-    marginBottom: 14,
-    lineHeight: 18,
+    color: "#6b7280",
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  newListCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 14,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    ...cardShadow,
+    alignSelf: "stretch",
+    width: "100%",
   },
   newListRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 8,
   },
   newListInput: { flex: 1, marginBottom: 0 },
   secondaryBtn: {
     height: 50,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#111",
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#111827",
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 88,
+    minWidth: 92,
+    backgroundColor: "#fff",
   },
-  secondaryBtnText: { fontSize: 15, fontWeight: "600", color: "#111" },
-  listSpinner: { marginVertical: 16 },
-  listItemsSpinner: { marginVertical: 12, alignSelf: "flex-start" },
-  listError: { color: "#c62828", fontSize: 14, marginBottom: 8 },
-  emptyList: { fontSize: 14, color: "#888", fontStyle: "italic" },
-  listCard: {
-    marginTop: 16,
-    paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ddd",
+  secondaryBtnPressed: { backgroundColor: "#f3f4f6" },
+  secondaryBtnText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
   },
-  listCardHeader: { marginBottom: 6 },
-  listHeaderPressable: {
-    paddingVertical: 4,
-    marginHorizontal: -4,
-    paddingHorizontal: 4,
+  listSpinner: { marginVertical: 20 },
+  listItemsSpinner: { marginVertical: 16, alignSelf: "center" },
+  inlineNoticeError: {
+    backgroundColor: "#fef2f2",
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#fecaca",
   },
+  listError: { color: "#b91c1c", fontSize: 14 },
+  emptyStateCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 20,
+    marginTop: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderStyle: "dashed",
+    alignSelf: "stretch",
+    width: "100%",
+  },
+  emptyList: { fontSize: 14, color: "#6b7280", textAlign: "center" },
+  collectionCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    ...cardShadow,
+    alignSelf: "stretch",
+    width: "100%",
+  },
+  listCardHeader: { marginBottom: 4 },
+  listOpenPressable: {
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    marginHorizontal: -10,
+    backgroundColor: "#f9fafb",
+  },
+  listOpenPressed: { opacity: 0.88 },
   listHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
   },
-  listChevron: {
-    fontSize: 12,
-    color: "#666",
-    width: 18,
+  openArrow: {
+    fontSize: 18,
+    color: "#2563eb",
+    fontWeight: "600",
   },
   listHeaderTitles: { flex: 1, minWidth: 0 },
-  listCardTitle: { fontSize: 17, fontWeight: "700", color: "#111" },
-  listCardCount: { fontSize: 13, color: "#666", marginTop: 2 },
+  listCardTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#111827",
+    textAlign: "left",
+  },
+  listCardCount: {
+    fontSize: 13,
+    color: "#6b7280",
+    marginTop: 3,
+    textAlign: "left",
+  },
+  countPill: {
+    minWidth: 28,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#111827",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countPillText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#fff",
+  },
   listCardActions: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    paddingLeft: 4,
+    marginTop: 4,
+    marginBottom: 4,
     gap: 6,
   },
-  linkAction: { fontSize: 14, color: "#1565c0", fontWeight: "500" },
-  actionSep: { fontSize: 14, color: "#999" },
-  dangerAction: { fontSize: 14, color: "#c62828", fontWeight: "500" },
-  renameRow: { gap: 8 },
+  linkAction: {
+    fontSize: 14,
+    color: "#2563eb",
+    fontWeight: "600",
+  },
+  textLinkPressed: { opacity: 0.6 },
+  actionSep: { fontSize: 14, color: "#d1d5db" },
+  dangerAction: { fontSize: 14, color: "#b91c1c", fontWeight: "600" },
+  renameRow: { gap: 10 },
+  renameActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 10,
+  },
   renameInput: { marginBottom: 0 },
   smallBtn: {
-    alignSelf: "flex-start",
-    backgroundColor: "#111",
+    backgroundColor: "#111827",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  smallBtnPressed: { opacity: 0.85 },
+  smallBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  smallBtnGhost: {
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 8,
+    borderRadius: 10,
+    backgroundColor: "#f3f4f6",
   },
-  smallBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
-  smallBtnMuted: { alignSelf: "flex-start", paddingVertical: 8 },
-  smallBtnMutedText: { color: "#666", fontSize: 14 },
-  listRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#eee",
-    gap: 12,
+  smallBtnGhostPressed: { backgroundColor: "#e5e7eb" },
+  smallBtnGhostText: { color: "#374151", fontWeight: "600", fontSize: 14 },
+  backLink: {
+    marginTop: 28,
+    alignSelf: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
   },
-  listRowThumb: {
-    width: 48,
-    height: 68,
-    borderRadius: 6,
-    backgroundColor: "#eee",
-  },
-  listRowText: { flex: 1, minWidth: 0 },
-  listTitle: { fontSize: 15, color: "#222", fontWeight: "500" },
-  listMeta: { fontSize: 12, color: "#666", marginTop: 4 },
-  removeBtn: { paddingVertical: 8, paddingHorizontal: 10, minWidth: 72 },
-  removeBtnText: { fontSize: 14, color: "#c62828", fontWeight: "600" },
-  emptyItems: {
-    fontSize: 13,
-    color: "#999",
-    fontStyle: "italic",
-    paddingVertical: 8,
+  backLinkPressed: { opacity: 0.55 },
+  backLinkText: {
+    fontSize: 15,
+    color: "#6b7280",
+    fontWeight: "600",
   },
 });
