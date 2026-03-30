@@ -6,6 +6,8 @@ export type ReadingListCollection = {
   manga_count: number;
   created_at: string | null;
   updated_at: string | null;
+  /** MangaDex id of the most recently added title (for list cover). */
+  latest_external_manga_id?: string | null;
 };
 
 export type ReadingListItem = {
@@ -148,4 +150,20 @@ export async function addToReadingList(
   );
   if (!res.ok) throw new Error(await readError(res));
   return res.json() as Promise<ReadingListItem>;
+}
+
+/** Sync display name to backend `public.users` (after Supabase Auth user_metadata is updated). */
+export async function patchAppUserDisplayName(
+  accessToken: string,
+  displayName: string,
+): Promise<void> {
+  const res = await fetch(`${BACKEND_URL}/users/me`, {
+    method: "PATCH",
+    headers: {
+      ...authHeaders(accessToken),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ display_name: displayName }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
 }

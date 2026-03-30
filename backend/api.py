@@ -3,7 +3,7 @@ Read-only API for the frontend. Wraps db list_entries, get_segments, get_chapter
 Run from backend:  uvicorn api:app --reload --host 0.0.0.0 --port 8000
 """
 
-from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import proxy
@@ -23,6 +23,7 @@ from db.schemas import (
     ReadingListCollectionRenameIn,
     ReadingListItemOut,
     SegmentListOut,
+    UserDisplayNamePatchIn,
 )
 
 # app = FastAPI(
@@ -152,6 +153,7 @@ def post_reading_list_collection(
         manga_count=0,
         created_at=col.created_at,
         updated_at=col.updated_at,
+        latest_external_manga_id=None,
     )
 
 
@@ -178,6 +180,7 @@ def patch_reading_list_collection(
         manga_count=0,
         created_at=col.created_at,
         updated_at=col.updated_at,
+        latest_external_manga_id=None,
     )
 
 
@@ -240,6 +243,21 @@ def delete_reading_list_item(
         raise HTTPException(status_code=404, detail="Not on this reading list")
     return {"ok": True}
 
+
+@router.patch("/users/me")
+def patch_me_display_name(ctx: CurrentAuthContext, body: UserDisplayNamePatchIn):
+    """Update display_name on public.users for the signed-in user."""
+    try:
+        db.update_app_user_display_name(
+            ctx.user_id,
+            body.display_name,
+            email=ctx.email,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return Response(status_code=204)
+
+
 ###########
 ###########
 ###########
@@ -251,6 +269,15 @@ async def proxy_manga_page(chapter_id: str, page_index: int):
         return {"error": "Page not found"}, 404
 
     return await proxy.get_manga_page_stream(urls[page_index])
+
+
+@router.get("/api/manga/chapter/{chapter_id}/pages")
+def get_chapter_page_urls(chapter_id: str):
+    """MangaDex at-home CDN URLs for every page in a chapter (for client readers)."""
+    urls = mangadex_service.get_chapter_panel_urls(chapter_id)
+    if not urls:
+        raise HTTPException(status_code=404, detail="No pages for this chapter")
+    return {"urls": urls}
 
 @router.get("/api/manga/cover_art")
 async def proxy_manga_cover_art(manga_id: str, file_name: str, size: int = 256):
@@ -264,6 +291,13 @@ async def get_manga_cover_json(manga_id: str):
     """MangaDex manga UUID → 256px cover URL for list UIs (no DB storage)."""
     cover_url = await mangadex_service.get_manga_cover_url_256(manga_id)
     return {"cover_url": cover_url}
+
+
+@router.get("/api/manga/{manga_id}/info")
+async def get_manga_info_json(manga_id: str):
+    """MangaDex title + synopsis for reading-list rows (no DB storage)."""
+    info = await mangadex_service.get_manga_public_info(manga_id)
+    return info
 
 
 @router.get("/api/manga/search")

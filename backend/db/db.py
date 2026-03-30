@@ -537,6 +537,29 @@ def ensure_app_user(
         session.commit()
 
 
+def update_app_user_display_name(
+    user_id: UUID,
+    display_name: Optional[str],
+    email: Optional[str] = None,
+    db_url=None,
+) -> None:
+    """Sync display_name on public.users (client updates Supabase Auth metadata separately)."""
+    trimmed = (display_name or "").strip() or None
+    if trimmed and len(trimmed) > 200:
+        raise ValueError("Display name is too long")
+    ensure_app_user(user_id, email=email, db_url=db_url)
+    engine = get_engine(db_url)
+    now = datetime.now(timezone.utc)
+    with Session(engine) as session:
+        row = session.exec(select(Users).where(Users.id == user_id)).first()
+        if row is None:
+            return
+        row.display_name = trimmed
+        row.updated_at = now
+        session.add(row)
+        session.commit()
+
+
 def get_reading_list_collection(
     user_id: UUID, collection_id: int, db_url=None
 ) -> Optional[ReadingListCollection]:
@@ -631,6 +654,38 @@ def list_reading_list_collections_with_counts(
             .group_by(ReadingListItem.reading_list_id)
         )
         count_map = {rid: int(n) for rid, n in session.exec(cnt_stmt).all()}
+        latest_ext: dict[int, Optional[str]] = {}
+        if ids:
+            rows = list(
+                session.exec(
+                    select(ReadingListItem, MangaSource)
+                    .join(Manga, ReadingListItem.manga_id == Manga.id)
+                    .outerjoin(
+                        MangaSource,
+                        (MangaSource.manga_id == Manga.id)
+                        & (MangaSource.provider_id == PROVIDER_MANGADEX),
+                    )
+                    .where(ReadingListItem.reading_list_id.in_(ids))
+                    .order_by(
+                        ReadingListItem.reading_list_id,
+                        desc(ReadingListItem.created_at),
+                    )
+                ).all()
+            )
+            for item, src in rows:
+                lid = item.reading_list_id
+                if lid in latest_ext:
+                    continue
+                ext: Optional[str] = None
+                if (
+                    src
+                    and src.external_manga_id
+                    and not _is_placeholder_external_manga_id(
+                        src.external_manga_id
+                    )
+                ):
+                    ext = src.external_manga_id
+                latest_ext[lid] = ext
     return [
         ReadingListCollectionOut(
             id=c.id,
@@ -638,6 +693,7 @@ def list_reading_list_collections_with_counts(
             created_at=c.created_at,
             updated_at=c.updated_at,
             manga_count=count_map.get(c.id, 0),
+            latest_external_manga_id=latest_ext.get(c.id),
         )
         for c in cols
     ]

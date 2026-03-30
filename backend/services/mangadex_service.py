@@ -39,6 +39,54 @@ async def get_manga_cover_url_256(manga_id: str) -> str | None:
     return _cover_url_from_manga_payload(data, manga_id)
 
 
+def _pick_localized_string(obj) -> str | None:
+    if not isinstance(obj, dict) or not obj:
+        return None
+    en = obj.get("en")
+    if isinstance(en, str) and en.strip():
+        return en.strip()
+    for v in obj.values():
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
+def _available_translated_languages(attrs: dict) -> list[str]:
+    raw = attrs.get("availableTranslatedLanguages")
+    if not isinstance(raw, list):
+        return []
+    return [str(x) for x in raw if isinstance(x, str)]
+
+
+async def get_manga_public_info(manga_id: str) -> dict:
+    """Localized title, description, and chapter languages from GET /manga/{id}."""
+    empty = {
+        "title": None,
+        "description": None,
+        "availableTranslatedLanguages": [],
+    }
+    url = f"{BASE_URL}/manga/{manga_id}"
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url, timeout=10.0)
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as e:
+            print(f"get_manga_public_info: {e}")
+            return empty
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return empty
+    attrs = data.get("attributes") or {}
+    if not isinstance(attrs, dict):
+        attrs = {}
+    return {
+        "title": _pick_localized_string(attrs.get("title")),
+        "description": _pick_localized_string(attrs.get("description")),
+        "availableTranslatedLanguages": _available_translated_languages(attrs),
+    }
+
+
 async def search_manga(title: str, limit: int =20, offset: int = 0, order_by: str = "followedCount", order_direction: str = "desc", cover_art: bool = True):
     """
     Todo: filters by tags (include, exclude)

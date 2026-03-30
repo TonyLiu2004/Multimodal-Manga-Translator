@@ -1,6 +1,6 @@
 """
 User table: app profile keyed by Supabase auth user id (UUID)
-  id: UUID, primary key — use auth.users.id when using Supabase Auth
+  id: UUID, primary key — same as auth.users.id when using Supabase Auth
   email: optional, unique when set
   display_name: optional
   created_at / updated_at: datetime

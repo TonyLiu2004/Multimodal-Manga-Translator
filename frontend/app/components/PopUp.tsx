@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { type Href, useRouter } from "expo-router";
 import {
   Modal,
   Text,
@@ -41,7 +41,7 @@ export default function PopUp({
   onClose,
 }: PopUpProps) {
   const router = useRouter();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const [listBusy, setListBusy] = React.useState(false);
   const [listMsg, setListMsg] = React.useState<string | null>(null);
   const [readingLists, setReadingLists] = React.useState<
@@ -125,7 +125,8 @@ export default function PopUp({
                   />
                 ) : readingLists.length === 0 ? (
                   <Text style={styles.listHint}>
-                    Create a reading list in Profile, then try again.
+                    Open Bookmarks in the sidebar to create a list, then try
+                    again.
                   </Text>
                 ) : (
                   <View style={styles.listChipsWrap}>
@@ -202,7 +203,35 @@ export default function PopUp({
                   </Text>
                 ) : null}
               </View>
-            ) : null}
+            ) : authLoading ? (
+              <View style={styles.readingListBlock}>
+                <Text style={styles.listPickerLabel}>Add to list</Text>
+                <ActivityIndicator
+                  size="small"
+                  color="#111"
+                  style={styles.listsSpinner}
+                />
+              </View>
+            ) : (
+              <View style={styles.readingListBlock}>
+                <Text style={styles.listPickerLabel}>Add to list</Text>
+                <Text style={styles.listHint}>
+                  Sign in to save this title to your reading lists.
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.signInCtaBtn,
+                    pressed && styles.signInCtaBtnPressed,
+                  ]}
+                  onPress={() => {
+                    onClose();
+                    router.push("/sign-in" as Href);
+                  }}
+                >
+                  <Text style={styles.signInCtaBtnText}>Sign in</Text>
+                </Pressable>
+              </View>
+            )}
 
             <View style={styles.chaptersSection}>
               <Text style={styles.chaptersTitle}>Chapters</Text>
@@ -374,6 +403,22 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   addListBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  signInCtaBtn: {
+    backgroundColor: "#111",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    alignSelf: "stretch",
+  },
+  signInCtaBtnPressed: {
+    opacity: 0.88,
+  },
+  signInCtaBtnText: {
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",

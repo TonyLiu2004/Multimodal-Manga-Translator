@@ -1,32 +1,40 @@
-import React, { useEffect, useState } from "react";
-import { useLocalSearchParams, router } from "expo-router";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
-import SearchBar from "../components/SearchBar";
-import SearchResults from "../components/SearchResults";
-import { Manga } from "../types/types";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import SearchBar from "@/app/components/SearchBar";
+import SearchResults from "@/app/components/SearchResults";
+import { BACKEND_URL } from "@/app/config";
+import type { Manga } from "@/app/types/types";
+import type { MangaSearchListJson } from "@/lib/apiTypes";
 
-import { BACKEND_URL } from "../config";
+function searchParamToString(v: string | string[] | undefined): string {
+  if (v == null) return "";
+  return Array.isArray(v) ? (v[0] ?? "") : v;
+}
 
 export default function SearchPage() {
-  const { query } = useLocalSearchParams();
-  const [searchQuery, setSearchQuery] = useState((query as string) || "");
+  const { query } = useLocalSearchParams<{ query?: string | string[] }>();
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState(() =>
+    searchParamToString(query),
+  );
   const [mangaList, setMangaList] = useState<Manga[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (query) {
-      setSearchQuery(query as string);
-      performSearch(query as string);
-    }
-  }, [query]);
-
-  const performSearch = async (searchTerm: string) => {
+  const performSearch = useCallback(async (searchTerm: string) => {
     if (!searchTerm.trim()) return;
 
     setLoading(true);
     try {
       const response = await fetch(
-        `${BACKEND_URL}/api/manga/search?title=${searchTerm}&limit=20&includes[]=cover_art`,
+        `${BACKEND_URL}/api/manga/search?title=${encodeURIComponent(
+          searchTerm.trim(),
+        )}&limit=20&includes[]=cover_art`,
         {
           method: "GET",
           headers: {
@@ -40,21 +48,27 @@ export default function SearchPage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const json = await response.json();
-      setMangaList(json.data || []);
+      const json = (await response.json()) as MangaSearchListJson;
+      setMangaList(json.data ?? []);
     } catch (error) {
       console.error("Search error:", error);
       setMangaList([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const q = searchParamToString(query);
+    if (!q) return;
+    setSearchQuery(q);
+    void performSearch(q);
+  }, [query, performSearch]);
 
   const handleSearch = () => {
-    if (searchQuery.trim()) {
-      router.setParams({ query: searchQuery });
-      performSearch(searchQuery);
-    }
+    const trimmed = searchQuery.trim();
+    if (!trimmed) return;
+    router.setParams({ query: trimmed });
   };
 
   return (

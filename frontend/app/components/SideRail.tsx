@@ -23,6 +23,7 @@ export default function SideRail() {
   };
 
   const isHome = pathname === "/" || pathname === "";
+  const isSearch = pathname === "/search" || pathname.startsWith("/search");
   const isBookmarks =
     pathname === "/bookmarks" || pathname.startsWith("/reading-list");
   const isProfile = pathname === "/profile";
@@ -59,41 +60,66 @@ export default function SideRail() {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Bookmarks"
-        onPress={() => router.replace("/bookmarks" as Href)}
+        accessibilityLabel="Search manga"
+        onPress={() => router.push("/search" as Href)}
         style={({ pressed }) => [
           styles.item,
-          isBookmarks && styles.itemActive,
+          isSearch && styles.itemActive,
           pressed && styles.itemPressed,
         ]}
       >
         <Ionicons
-          name="bookmark"
+          name="search"
           size={ICON_SZ}
-          color={isBookmarks ? ICON_ACTIVE : ICON_COLOR}
+          color={isSearch ? ICON_ACTIVE : ICON_COLOR}
         />
       </Pressable>
 
-      <View style={styles.spacer} />
+      {session ? (
+        <>
+          <View style={styles.underHomeGap} />
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Profile and settings"
-        onPress={() => router.replace("/profile" as Href)}
-        style={({ pressed }) => [
-          styles.item,
-          isProfile && styles.itemActive,
-          pressed && styles.itemPressed,
-        ]}
-      >
-        <Ionicons
-          name="settings-outline"
-          size={ICON_SZ}
-          color={isProfile ? ICON_ACTIVE : ICON_COLOR}
-        />
-      </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Bookmarks"
+            onPress={() => router.replace("/bookmarks" as Href)}
+            style={({ pressed }) => [
+              styles.item,
+              isBookmarks && styles.itemActive,
+              pressed && styles.itemPressed,
+            ]}
+          >
+            <Ionicons
+              name="bookmark"
+              size={ICON_SZ}
+              color={isBookmarks ? ICON_ACTIVE : ICON_COLOR}
+            />
+          </Pressable>
 
-      <View style={styles.afterGearGap} />
+          <View style={styles.spacer} />
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Profile and settings"
+            onPress={() => router.replace("/profile" as Href)}
+            style={({ pressed }) => [
+              styles.item,
+              isProfile && styles.itemActive,
+              pressed && styles.itemPressed,
+            ]}
+          >
+            <Ionicons
+              name="settings-outline"
+              size={ICON_SZ}
+              color={isProfile ? ICON_ACTIVE : ICON_COLOR}
+            />
+          </Pressable>
+
+          <View style={styles.afterGearGap} />
+        </>
+      ) : (
+        <View style={styles.spacer} />
+      )}
 
       {session ? (
         <Pressable

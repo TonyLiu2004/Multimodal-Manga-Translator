@@ -12,8 +12,8 @@ NOTES:
 
 Deployed Frontend URL: https://manglify-d6ebc.web.app/
 Deployed Backend URL: https://tonyliu404-manglify-backend.hf.space/
-- Huggingface Page: https://huggingface.co/spaces/tonyliu404/Manglify_Backend
 
+- Huggingface Page: https://huggingface.co/spaces/tonyliu404/Manglify_Backend
 
 ## Prerequisites
 

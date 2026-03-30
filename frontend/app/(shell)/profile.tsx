@@ -13,6 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
+import { patchAppUserDisplayName } from "@/lib/readingListApi";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 
 export default function ProfileScreen() {
@@ -44,13 +45,27 @@ export default function ProfileScreen() {
     }
     setSaving(true);
     try {
-      const { error: updateError } = await getSupabase().auth.updateUser({
-        data: { display_name: displayName.trim() },
+      const supabase = getSupabase();
+      const name = displayName.trim();
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { display_name: name },
       });
       if (updateError) {
         setError(updateError.message);
         return;
       }
+      const { data: refreshed, error: refreshError } =
+        await supabase.auth.refreshSession();
+      if (refreshError) {
+        setError(refreshError.message);
+        return;
+      }
+      const token = refreshed.session?.access_token;
+      if (!token) {
+        setError("Could not refresh session after save.");
+        return;
+      }
+      await patchAppUserDisplayName(token, name);
       setSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");

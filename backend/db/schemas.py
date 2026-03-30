@@ -35,6 +35,8 @@ class ReadingListCollectionOut(SQLModel):
     manga_count: int = 0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    #: MangaDex id of the most recently *added* list item (for cover thumbnails).
+    latest_external_manga_id: Optional[str] = None
 
 
 class ReadingListCollectionCreateIn(SQLModel):
@@ -43,6 +45,12 @@ class ReadingListCollectionCreateIn(SQLModel):
 
 class ReadingListCollectionRenameIn(SQLModel):
     name: str
+
+
+class UserDisplayNamePatchIn(SQLModel):
+    """Display name stored in public.users and mirrored from Supabase Auth user_metadata."""
+
+    display_name: str = Field(default="", max_length=200)
 
 
 class ReadingListItemOut(SQLModel):

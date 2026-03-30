@@ -1,12 +1,11 @@
-import { Text, ScrollView, StyleSheet, Pressable, View } from "react-native";
-import React, { useEffect, useState } from "react";
+import { Text, ScrollView, StyleSheet } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
 import MangaCarousel from "./MangaCarousel";
 import MangaCategoryList from "./MangaCategoryList";
 import { Manga } from "../types/types";
 import SearchBar from "./SearchBar";
-import { useRouter } from "expo-router";
-import { useAuth } from "@/context/AuthContext";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { type Href, useRouter } from "expo-router";
+import type { MangaSearchListJson } from "@/lib/apiTypes";
 
 import { BACKEND_URL } from "../config";
 
@@ -16,14 +15,23 @@ export default function Index() {
   const [recentManga, setRecentManga] = useState<Manga[]>([]);
   const [actionManga, setActionManga] = useState<Manga[]>([]);
   const [romanceManga, setRomanceManga] = useState<Manga[]>([]);
-  const { session, loading: authLoading, userLabel } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    loadHomePage();
+  const fetchBackend = useCallback(async (params: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/manga/search?${params}`, {
+        headers: {
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
+      const json = (await res.json()) as MangaSearchListJson;
+      return json.data ?? [];
+    } catch {
+      return [];
+    }
   }, []);
 
-  const loadHomePage = async () => {
+  const loadHomePage = useCallback(async () => {
     const [popular, recent, action, romance] = await Promise.all([
       fetchBackend("limit=10&order_by=followedCount&order_direction=desc"),
       fetchBackend("limit=6&order[latestUploadedChapter]=desc"),
@@ -39,38 +47,19 @@ export default function Index() {
     setRecentManga(recent);
     setActionManga(action);
     setRomanceManga(romance);
-  };
+  }, [fetchBackend]);
 
-  const fetchBackend = async (params: string) => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/manga/search?${params}`, {
-        headers: {
-          "ngrok-skip-browser-warning": "true",
-        },
-      });
-      const json = await res.json();
-      return json.data || [];
-    } catch {
-      return [];
-    }
-  };
+  useEffect(() => {
+    void loadHomePage();
+  }, [loadHomePage]);
 
-  // const fetchMangaDex = async (params: string) => {
-  //   try {
-  //     const res = await fetch(
-  //       `https://api.mangadex.org/manga?${params}&includes[]=cover_art`,
-  //     );
-  //     const json = await res.json();
-  //     return json.data || [];
-  //   } catch {
-  //     return [];
-  //   }
-  // };
-
-  const handleSearch = async () => {
-    if (searchQuery.trim()) {
-      (router as any).push(`/search?query=${encodeURIComponent(searchQuery)}`);
-    }
+  const handleSearch = () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    router.push({
+      pathname: "/search",
+      params: { query: q },
+    } as Href);
   };
 
   return (
@@ -82,7 +71,7 @@ export default function Index() {
         padding: 20,
       }}
     >
-        <Text style={styles.h1}>Manglify</Text>
+      <Text style={styles.h1}>Manglify</Text>
 
       <SearchBar
         placeholder="Search manga..."

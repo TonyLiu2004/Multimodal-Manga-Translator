@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Platform,
   Pressable,
   RefreshControl,
@@ -11,21 +10,30 @@ import {
   Text,
   View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { type Href, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import PopUp from "@/app/components/PopUp";
 import { useAuth } from "@/context/AuthContext";
+import type { Chapter, Manga } from "@/app/types/types";
 import {
   fetchReadingListItems,
   removeReadingListItem,
   type ReadingListItem,
 } from "@/lib/readingListApi";
-import { fetchMangaCoverUrl } from "@/lib/mangaCoverApi";
-import PopUp from "@/app/components/PopUp";
-import { BACKEND_URL } from "@/app/config";
-import type { Chapter, Manga } from "@/app/types/types";
+import {
+  buildMangaForPopup,
+  COVER_PLACEHOLDER,
+  descriptionPreviewForTile,
+  fetchChaptersForManga,
+  hydrateMangaCovers,
+  hydrateMangaInfos,
+  pickChapterForListItem,
+  titleForListItem,
+  type MangaPublicInfo,
+} from "@/lib/readingListDetailManga";
+import ReadingListGridTile from "./ReadingListGridTile";
 
-const COVER_PLACEHOLDER =
-  "https://via.placeholder.com/128x180?text=No+Cover";
+const gridGap = 8;
 
 const cardShadow = Platform.select({
   ios: {
@@ -38,101 +46,11 @@ const cardShadow = Platform.select({
   default: {},
 });
 
-function normalizeParam(v: string | string[] | undefined): string | undefined {
+function normalizeRouteParam(
+  v: string | string[] | undefined,
+): string | undefined {
   if (v == null) return undefined;
   return Array.isArray(v) ? v[0] : v;
-}
-
-function mapMdJsonToManga(data: Record<string, unknown>): Manga | null {
-  if (typeof data.id !== "string") return null;
-  const attrs = data.attributes as Record<string, unknown> | undefined;
-  const titleRaw = attrs?.title as Record<string, string> | undefined;
-  const descRaw = attrs?.description as Record<string, string> | undefined;
-  const langs = attrs?.availableTranslatedLanguages as string[] | undefined;
-  const rels = (data.relationships as unknown[]) ?? [];
-  return {
-    id: data.id,
-    attributes: {
-      title:
-        titleRaw && typeof titleRaw === "object" ? titleRaw : { en: "Untitled" },
-      description:
-        descRaw && typeof descRaw === "object"
-          ? { en: descRaw.en ?? descRaw["en"] }
-          : {},
-      availableTranslatedLanguages: Array.isArray(langs) ? langs : [],
-    },
-    relationships: rels.map((r: unknown) => {
-      const o = r as Record<string, unknown>;
-      return {
-        type: String(o.type ?? ""),
-        attributes: o.attributes as { fileName?: string } | undefined,
-      };
-    }),
-  };
-}
-
-async function fetchMangaDexManga(mangaId: string): Promise<Manga | null> {
-  try {
-    const res = await fetch(
-      `https://api.mangadex.org/manga/${mangaId}?includes[]=cover_art`,
-    );
-    if (!res.ok) return null;
-    const json = (await res.json()) as { data?: Record<string, unknown> };
-    const data = json.data;
-    if (!data) return null;
-    return mapMdJsonToManga(data);
-  } catch {
-    return null;
-  }
-}
-
-function coverUrlFromManga(manga: Manga): string {
-  const coverArt = manga.relationships?.find((rel) => rel.type === "cover_art");
-  const fileName = coverArt?.attributes?.fileName;
-  return fileName
-    ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}.256.jpg`
-    : COVER_PLACEHOLDER;
-}
-
-async function fetchChaptersForManga(mangaId: string): Promise<Chapter[]> {
-  const res = await fetch(`${BACKEND_URL}/api/manga/${mangaId}/chapters`);
-  if (!res.ok) return [];
-  const json = await res.json();
-  const rows = (json.data || []) as Record<string, unknown>[];
-  return rows.map((ch) => {
-    const a = (ch.attributes ?? {}) as Record<string, unknown>;
-    return {
-      id: String(ch.id),
-      chapter: String(a.chapter ?? "?"),
-      title: String(a.title ?? ""),
-      pages: typeof a.pages === "number" ? a.pages : 0,
-      language: String(a.translatedLanguage ?? "unknown"),
-    };
-  });
-}
-
-async function hydrateMangaCovers(
-  items: ReadingListItem[],
-  setCoverUrls: React.Dispatch<
-    React.SetStateAction<Record<string, string | null>>
-  >,
-) {
-  const extIds = [
-    ...new Set(items.map((i) => i.external_manga_id).filter(Boolean)),
-  ] as string[];
-  setCoverUrls((prev) => {
-    const need = extIds.filter((id) => !(id in prev));
-    if (need.length === 0) return prev;
-    void (async () => {
-      const results = Object.fromEntries(
-        await Promise.all(
-          need.map(async (id) => [id, await fetchMangaCoverUrl(id)] as const),
-        ),
-      ) as Record<string, string | null>;
-      setCoverUrls((p) => ({ ...p, ...results }));
-    })();
-    return prev;
-  });
 }
 
 export default function ReadingListDetailScreen() {
@@ -143,23 +61,27 @@ export default function ReadingListDetailScreen() {
   }>();
   const { session, loading: authLoading } = useAuth();
 
-  const idStr = normalizeParam(rawId);
+  const idStr = normalizeRouteParam(rawId);
   const listId = idStr != null ? Number(idStr) : NaN;
-  const listTitle =
-    normalizeParam(rawTitle) ?? "Reading list";
+  const listTitle = normalizeRouteParam(rawTitle) ?? "Reading list";
 
   const [items, setItems] = useState<ReadingListItem[] | null>(null);
   const [coverUrls, setCoverUrls] = useState<Record<string, string | null>>({});
+  const [mangaInfos, setMangaInfos] = useState<
+    Record<string, MangaPublicInfo | undefined>
+  >({});
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
+  const [openingReaderKey, setOpeningReaderKey] = useState<string | null>(null);
 
   const [popupVisible, setPopupVisible] = useState(false);
   const [popupManga, setPopupManga] = useState<Manga | null>(null);
+  const [popupCoverArt, setPopupCoverArt] = useState(COVER_PLACEHOLDER);
   const [popupChapters, setPopupChapters] = useState<Chapter[]>([]);
-  const [loadingPopupChapters, setLoadingPopupChapters] = useState(false);
-  const [openingPopup, setOpeningPopup] = useState(false);
+  const [popupChaptersLoading, setPopupChaptersLoading] = useState(false);
 
   const loadItems = useCallback(async () => {
     if (!session?.access_token || !Number.isFinite(listId)) return;
@@ -167,7 +89,9 @@ export default function ReadingListDetailScreen() {
     try {
       const data = await fetchReadingListItems(session.access_token, listId);
       setItems(data);
-      await hydrateMangaCovers(data, setCoverUrls);
+      setMangaInfos({});
+      void hydrateMangaCovers(data, setCoverUrls);
+      void hydrateMangaInfos(data, setMangaInfos);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Could not load this reading list.",
@@ -202,48 +126,57 @@ export default function ReadingListDetailScreen() {
     }
   }, [session?.access_token, loadItems]);
 
-  const openPopupForItem = async (item: ReadingListItem) => {
+  const openReaderForItem = async (item: ReadingListItem, rowKey: string) => {
     const extId = item.external_manga_id;
     if (extId == null || extId === "") {
       Alert.alert(
         "Unavailable",
-        "This entry has no linked MangaDex id, so details can't be opened.",
+        "This entry has no linked MangaDex id, so the reader can't be opened.",
       );
       return;
     }
-    setOpeningPopup(true);
-    setPopupChapters([]);
-    setLoadingPopupChapters(false);
+    setOpeningReaderKey(rowKey);
     try {
-      const manga = await fetchMangaDexManga(extId);
-      if (!manga) {
-        Alert.alert(
-          "Couldn't load manga",
-          "This title may be unavailable on MangaDex.",
-        );
+      const chapters = await fetchChaptersForManga(extId);
+      const chapter = pickChapterForListItem(
+        chapters,
+        item.last_chapter_number,
+      );
+      if (!chapter) {
+        Alert.alert("No chapters", "No chapters were found for this title.");
         return;
       }
-      setPopupManga(manga);
-      setPopupVisible(true);
-      setLoadingPopupChapters(true);
-      try {
-        const ch = await fetchChaptersForManga(extId);
-        setPopupChapters(ch);
-      } catch {
-        setPopupChapters([]);
-      } finally {
-        setLoadingPopupChapters(false);
-      }
+      router.push(`/reader/${chapter.id}` as Href);
+    } catch {
+      Alert.alert("Error", "Could not load chapters for this title.");
     } finally {
-      setOpeningPopup(false);
+      setOpeningReaderKey(null);
     }
   };
 
-  const closePopup = () => {
+  const openDetailPopup = useCallback(
+    (item: ReadingListItem, extId: string) => {
+      const info = mangaInfos[extId];
+      const cov = coverUrls[extId] ?? null;
+      setPopupManga(buildMangaForPopup(extId, item, info, cov));
+      setPopupCoverArt(cov ?? COVER_PLACEHOLDER);
+      setPopupVisible(true);
+      setPopupChapters([]);
+      setPopupChaptersLoading(true);
+      void fetchChaptersForManga(extId)
+        .then(setPopupChapters)
+        .finally(() => setPopupChaptersLoading(false));
+    },
+    [mangaInfos, coverUrls],
+  );
+
+  const closeDetailPopup = useCallback(() => {
     setPopupVisible(false);
     setPopupManga(null);
     setPopupChapters([]);
-  };
+    setPopupChaptersLoading(false);
+    setPopupCoverArt(COVER_PLACEHOLDER);
+  }, []);
 
   const onRemoveItem = async (mangaId: number) => {
     if (!session?.access_token || !Number.isFinite(listId)) return;
@@ -264,9 +197,11 @@ export default function ReadingListDetailScreen() {
     }
   };
 
+  const readerBusy = openingReaderKey !== null;
+
   if (authLoading || !session) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={styles.safe} edges={["top", "right", "bottom"]}>
         <ActivityIndicator style={styles.loader} color="#374151" />
       </SafeAreaView>
     );
@@ -274,7 +209,7 @@ export default function ReadingListDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "right", "bottom"]}>
-      <View style={styles.pageCenter}>
+      <View style={styles.page}>
         <View style={styles.toolbar}>
           <Pressable
             onPress={() => router.back()}
@@ -299,103 +234,84 @@ export default function ReadingListDetailScreen() {
             />
           }
         >
-          <Text style={styles.pageTitle} numberOfLines={2}>
-            {listTitle}
-          </Text>
-          <Text style={styles.subtitle}>
-            {items == null && loading
-              ? "Loading…"
-              : `${items?.length ?? 0} title${
-                  items?.length === 1 ? "" : "s"
-                }`}
-          </Text>
+          <View style={styles.column}>
+            <Text style={styles.pageTitle} numberOfLines={2}>
+              {listTitle}
+            </Text>
+            <Text style={styles.subtitle}>
+              {items == null && loading
+                ? "Loading…"
+                : `${items?.length ?? 0} title${
+                    items?.length === 1 ? "" : "s"
+                  }`}
+            </Text>
 
-          {error ? (
-            <View style={styles.noticeError}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
-
-          {loading && items == null ? (
-            <ActivityIndicator
-              style={styles.spinner}
-              color="#374151"
-              size="large"
-            />
-          ) : null}
-
-          {!loading && items && items.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>
-                No manga in this list yet. Add some from search or the home
-                screen.
-              </Text>
-            </View>
-          ) : null}
-
-          {items?.map((item) => {
-            const rk = `${listId}-${item.manga_id}`;
-            const extId = item.external_manga_id;
-            const resolvedCover =
-              extId != null && extId !== "" ? coverUrls[extId] : null;
-            const coverUri = resolvedCover ?? COVER_PLACEHOLDER;
-            const canOpen = extId != null && extId !== "";
-            return (
-              <View key={item.id} style={styles.listRow}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.rowMainPress,
-                    pressed && canOpen && styles.rowMainPressed,
-                    !canOpen && styles.rowMainDisabled,
-                  ]}
-                  onPress={() => void openPopupForItem(item)}
-                  disabled={openingPopup}
-                >
-                  <Image
-                    source={{ uri: coverUri }}
-                    style={styles.thumb}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.rowText}>
-                    <Text style={styles.rowTitle} numberOfLines={2}>
-                      {item.manga_title}
-                    </Text>
-                    {item.last_chapter_number != null ? (
-                      <Text style={styles.rowMeta}>
-                        Last read · Ch. {item.last_chapter_number}
-                      </Text>
-                    ) : null}
-                    {canOpen ? (
-                      <Text style={styles.tapHint}>
-                        Tap for details and chapters
-                      </Text>
-                    ) : null}
-                  </View>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.removeBtn,
-                    pressed && styles.removeBtnPressed,
-                  ]}
-                  onPress={() => void onRemoveItem(item.manga_id)}
-                  disabled={removingKey === rk}
-                >
-                  {removingKey === rk ? (
-                    <ActivityIndicator size="small" color="#b91c1c" />
-                  ) : (
-                    <Text style={styles.removeBtnText}>Remove</Text>
-                  )}
-                </Pressable>
+            {error ? (
+              <View style={styles.noticeError}>
+                <Text style={styles.errorText}>{error}</Text>
               </View>
-            );
-          })}
-        </ScrollView>
+            ) : null}
 
-        {openingPopup ? (
-          <View style={styles.popupLoadingOverlay} pointerEvents="none">
-            <ActivityIndicator size="large" color="#374151" />
+            {loading && items == null ? (
+              <ActivityIndicator
+                style={styles.spinner}
+                color="#374151"
+                size="large"
+              />
+            ) : null}
+
+            {!loading && items && items.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyText}>
+                  No manga in this list yet. Add some from search or the home
+                  screen.
+                </Text>
+              </View>
+            ) : null}
+
+            {items != null && items.length > 0 ? (
+              <View style={[styles.gridWrap, { gap: gridGap }]}>
+                {items.map((item) => {
+                  const rk = `${listId}-${item.manga_id}`;
+                  const extId = item.external_manga_id;
+                  const resolved =
+                    extId != null && extId !== ""
+                      ? coverUrls[extId]
+                      : null;
+                  const coverUri = resolved ?? COVER_PLACEHOLDER;
+                  const canOpen = extId != null && extId !== "";
+                  const info = extId ? mangaInfos[extId] : undefined;
+
+                  const { descLoading, previewText, showReadMore } =
+                    descriptionPreviewForTile(extId, info);
+
+                  return (
+                    <ReadingListGridTile
+                      key={item.id}
+                      item={item}
+                      coverUri={coverUri}
+                      displayTitle={titleForListItem(item, info)}
+                      descLoading={descLoading}
+                      previewText={previewText}
+                      showReadMore={showReadMore}
+                      extId={extId}
+                      canOpen={canOpen}
+                      openingThisTile={openingReaderKey === rk}
+                      readerBusy={readerBusy}
+                      removing={removingKey === rk}
+                      onCoverPress={() => void openReaderForItem(item, rk)}
+                      onChapterPress={() => void openReaderForItem(item, rk)}
+                      onReadMore={() => {
+                        if (extId != null) openDetailPopup(item, extId);
+                      }}
+                      onRemove={() => void onRemoveItem(item.manga_id)}
+                    />
+                  );
+                })}
+              </View>
+            ) : null}
           </View>
-        ) : null}
+        </ScrollView>
       </View>
 
       {popupManga ? (
@@ -405,13 +321,14 @@ export default function ReadingListDetailScreen() {
             Object.values(popupManga.attributes.title)[0] || "Untitled"
           }
           summary={
-            popupManga.attributes.description?.en || "No description available."
+            popupManga.attributes.description?.en ||
+            "No description available."
           }
-          coverArt={coverUrlFromManga(popupManga)}
+          coverArt={popupCoverArt}
           manga={popupManga}
           chapters={popupChapters}
-          loadingChapters={loadingPopupChapters}
-          onClose={closePopup}
+          loadingChapters={popupChaptersLoading}
+          onClose={closeDetailPopup}
         />
       ) : null}
     </SafeAreaView>
@@ -421,14 +338,13 @@ export default function ReadingListDetailScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f3f4f6" },
   loader: { marginTop: 48 },
-  pageCenter: {
+  page: {
     flex: 1,
     width: "100%",
-    maxWidth: 440,
-    alignSelf: "center",
+    alignItems: "stretch",
   },
   toolbar: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 4,
   },
@@ -444,36 +360,47 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   scroll: {
+    flexGrow: 1,
+    width: "100%",
+    paddingVertical: 24,
+    paddingBottom: 40,
     paddingHorizontal: 20,
-    paddingBottom: 32,
-    alignItems: "center",
+    alignItems: "stretch",
+  },
+  column: {
+    width: "100%",
+    alignItems: "stretch",
   },
   pageTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: "800",
     color: "#111827",
-    textAlign: "center",
+    textAlign: "left",
     letterSpacing: -0.4,
-    marginBottom: 6,
-    maxWidth: "100%",
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
     color: "#6b7280",
-    textAlign: "center",
-    marginBottom: 20,
+    textAlign: "left",
+    lineHeight: 20,
+    marginBottom: 16,
   },
   noticeError: {
     backgroundColor: "#fef2f2",
     borderRadius: 12,
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: "#fecaca",
     width: "100%",
   },
-  errorText: { color: "#b91c1c", fontSize: 14 },
-  spinner: { marginVertical: 32 },
+  errorText: {
+    color: "#b91c1c",
+    fontSize: 14,
+    textAlign: "left",
+  },
+  spinner: { marginVertical: 24 },
   emptyCard: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -487,73 +414,14 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15,
     color: "#6b7280",
-    textAlign: "center",
+    textAlign: "left",
     lineHeight: 22,
   },
-  listRow: {
+  gridWrap: {
     flexDirection: "row",
-    alignItems: "center",
+    flexWrap: "wrap",
     width: "100%",
-    paddingVertical: 8,
-    paddingRight: 8,
-    paddingLeft: 4,
-    marginBottom: 10,
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    ...cardShadow,
-  },
-  rowMainPress: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    minWidth: 0,
-    paddingVertical: 4,
-    paddingLeft: 8,
-    borderRadius: 12,
-  },
-  rowMainPressed: { opacity: 0.88 },
-  rowMainDisabled: { opacity: 0.72 },
-  tapHint: {
-    fontSize: 11,
-    color: "#2563eb",
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  popupLoadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  thumb: {
-    width: 52,
-    height: 74,
-    borderRadius: 8,
-    backgroundColor: "#e5e7eb",
-  },
-  rowText: { flex: 1, minWidth: 0 },
-  rowTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  rowMeta: { fontSize: 12, color: "#6b7280", marginTop: 4 },
-  removeBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    minWidth: 76,
-    borderRadius: 10,
-    backgroundColor: "#fef2f2",
-  },
-  removeBtnPressed: { backgroundColor: "#fee2e2" },
-  removeBtnText: {
-    fontSize: 13,
-    color: "#b91c1c",
-    fontWeight: "700",
-    textAlign: "center",
+    marginBottom: 12,
+    alignItems: "flex-start",
   },
 });

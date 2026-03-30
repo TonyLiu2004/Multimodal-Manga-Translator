@@ -2,18 +2,21 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import BookmarksCollectionTile, {
+  resolveCollectionCoverUri,
+} from "@/app/(shell)/bookmarks/BookmarksCollectionTile";
+import BookmarksNewListTile from "@/app/(shell)/bookmarks/BookmarksNewListTile";
+import CreateReadingListModal from "@/app/(shell)/bookmarks/CreateReadingListModal";
 import { useAuth } from "@/context/AuthContext";
+import { fetchMangaCoverUrl } from "@/lib/mangaCoverApi";
 import {
   createReadingList,
   deleteReadingList,
@@ -22,26 +25,24 @@ import {
   type ReadingListCollection,
 } from "@/lib/readingListApi";
 
-const cardShadow = Platform.select({
-  ios: {
-    shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
-  },
-  android: { elevation: 3 },
-  default: {},
-});
+const gridGap = 8;
 
 export default function BookmarksScreen() {
   const router = useRouter();
   const { session, loading: authLoading } = useAuth();
+
   const [collections, setCollections] = useState<ReadingListCollection[]>([]);
+  const [coverUrls, setCoverUrls] = useState<Record<string, string | null>>(
+    {},
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
   const [newListName, setNewListName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [savingRename, setSavingRename] = useState(false);
@@ -74,6 +75,29 @@ export default function BookmarksScreen() {
     void load();
   }, [authLoading, session, load, router]);
 
+  useEffect(() => {
+    const extIds = [
+      ...new Set(
+        collections
+          .map((c) => c.latest_external_manga_id)
+          .filter((x): x is string => Boolean(x)),
+      ),
+    ];
+    if (extIds.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const entries = await Promise.all(
+        extIds.map(async (id) => [id, await fetchMangaCoverUrl(id)] as const),
+      );
+      if (cancelled) return;
+      setCoverUrls((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [collections]);
+
   const onRefresh = useCallback(async () => {
     if (!session?.access_token) return;
     setRefreshing(true);
@@ -84,6 +108,17 @@ export default function BookmarksScreen() {
     }
   }, [session?.access_token, load]);
 
+  const closeCreateModal = () => {
+    if (creating) return;
+    setCreateModalVisible(false);
+    setNewListName("");
+  };
+
+  const openCreateModal = () => {
+    setNewListName("");
+    setCreateModalVisible(true);
+  };
+
   const onCreateList = async () => {
     const name = newListName.trim();
     if (!name || !session?.access_token) return;
@@ -92,6 +127,7 @@ export default function BookmarksScreen() {
     try {
       await createReadingList(session.access_token, name);
       setNewListName("");
+      setCreateModalVisible(false);
       await load();
     } catch (e) {
       setError(
@@ -172,8 +208,22 @@ export default function BookmarksScreen() {
     );
   }
 
+  const createSubmitEnabled = Boolean(
+    session.access_token && newListName.trim(),
+  );
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "right", "bottom"]}>
+      <CreateReadingListModal
+        visible={createModalVisible}
+        creating={creating}
+        newListName={newListName}
+        onChangeName={setNewListName}
+        onClose={closeCreateModal}
+        onSubmit={onCreateList}
+        submitEnabled={createSubmitEnabled}
+      />
+
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -189,40 +239,9 @@ export default function BookmarksScreen() {
         <View style={styles.column}>
           <Text style={styles.title}>Bookmarks</Text>
           <Text style={styles.hint}>
-            Reading lists and saved manga. Create a list below, then add titles
-            from search or when you open a manga.
+            Reading lists and saved manga. Use Create new list to add one, then
+            save titles from search or when you open a manga.
           </Text>
-
-          <View style={styles.newListCard}>
-            <Text style={styles.newListLabel}>New list</Text>
-            <TextInput
-              style={styles.newListInput}
-              placeholder="List name"
-              placeholderTextColor="#9ca3af"
-              value={newListName}
-              onChangeText={setNewListName}
-              editable={!creating}
-              onSubmitEditing={() => void onCreateList()}
-              returnKeyType="done"
-            />
-            <Pressable
-              style={({ pressed }) => [
-                styles.createButton,
-                creating && styles.createButtonDisabled,
-                pressed && !creating && styles.createButtonPressed,
-              ]}
-              onPress={() => void onCreateList()}
-              disabled={
-                creating || !newListName.trim() || !session.access_token
-              }
-            >
-              {creating ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.createButtonText}>Create</Text>
-              )}
-            </Pressable>
-          </View>
 
           {error ? (
             <View style={styles.noticeError}>
@@ -232,104 +251,43 @@ export default function BookmarksScreen() {
 
           {loading && collections.length === 0 ? (
             <ActivityIndicator style={styles.spinner} color="#374151" />
-          ) : null}
+          ) : (
+            <View style={[styles.gridWrap, { gap: gridGap }]}>
+              <BookmarksNewListTile
+                creating={creating}
+                onPressCreate={openCreateModal}
+              />
 
-          {!loading && collections.length === 0 && !error ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>
-                No lists yet. Add one above, then save manga from the home screen
-                or search.
-              </Text>
-            </View>
-          ) : null}
-
-          {collections.map((c) => (
-            <View key={c.id} style={styles.card}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.cardMain,
-                  pressed && styles.cardMainPressed,
-                ]}
-                onPress={() =>
-                  router.push({
-                    pathname: "/reading-list/[id]",
-                    params: { id: String(c.id), title: c.name },
-                  })
-                }
-                disabled={deletingId === c.id}
-              >
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>
-                    {c.name}
-                  </Text>
-                  <Text style={styles.cardMeta}>
-                    {c.manga_count} title{c.manga_count === 1 ? "" : "s"}
-                  </Text>
-                </View>
-                <View style={styles.countPill}>
-                  <Text style={styles.countPillText}>{c.manga_count}</Text>
-                </View>
-                <Text style={styles.openArrow}>→</Text>
-              </Pressable>
-
-              {editingId === c.id ? (
-                <View style={styles.editBlock}>
-                  <TextInput
-                    style={styles.renameInput}
-                    value={editName}
-                    onChangeText={setEditName}
-                    autoFocus
-                    editable={!savingRename}
+              {collections.map((c) => {
+                const ext = c.latest_external_manga_id;
+                const { uri, loading: coverLoading } =
+                  resolveCollectionCoverUri(ext, coverUrls);
+                return (
+                  <BookmarksCollectionTile
+                    key={c.id}
+                    collection={c}
+                    coverUri={uri}
+                    coverLoading={coverLoading}
+                    isEditing={editingId === c.id}
+                    editName={editName}
+                    onChangeEditName={setEditName}
+                    onOpenList={() =>
+                      router.push({
+                        pathname: "/reading-list/[id]",
+                        params: { id: String(c.id), title: c.name },
+                      })
+                    }
+                    onStartRename={() => startRename(c)}
+                    onCancelRename={cancelRename}
+                    onSaveRename={onSaveRename}
+                    savingRename={savingRename}
+                    onRequestDelete={() => confirmDelete(c)}
+                    deleting={deletingId === c.id}
                   />
-                  <View style={styles.editActions}>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.smallButton,
-                        pressed && styles.smallButtonPressed,
-                      ]}
-                      onPress={() => void onSaveRename()}
-                      disabled={savingRename || !editName.trim()}
-                    >
-                      {savingRename ? (
-                        <ActivityIndicator color="#fff" size="small" />
-                      ) : (
-                        <Text style={styles.smallButtonText}>Save</Text>
-                      )}
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.smallButtonGhost,
-                        pressed && styles.smallButtonGhostPressed,
-                      ]}
-                      onPress={cancelRename}
-                      disabled={savingRename}
-                    >
-                      <Text style={styles.smallButtonGhostText}>Cancel</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.cardActions}>
-                  <Pressable
-                    onPress={() => startRename(c)}
-                    disabled={deletingId === c.id}
-                    hitSlop={8}
-                  >
-                    <Text style={styles.actionLink}>Rename</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => confirmDelete(c)}
-                    disabled={deletingId === c.id}
-                    hitSlop={8}
-                  >
-                    <Text style={styles.actionDanger}>
-                      {deletingId === c.id ? "Deleting…" : "Delete"}
-                    </Text>
-                  </Pressable>
-                </View>
-              )}
+                );
+              })}
             </View>
-          ))}
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -340,15 +298,16 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f3f4f6" },
   loader: { marginTop: 48 },
   scroll: {
+    flexGrow: 1,
+    width: "100%",
     paddingVertical: 24,
     paddingBottom: 40,
-    alignItems: "center",
+    paddingHorizontal: 20,
+    alignItems: "stretch",
   },
   column: {
     width: "100%",
-    maxWidth: 440,
-    paddingHorizontal: 24,
-    alignItems: "center",
+    alignItems: "stretch",
   },
   title: {
     fontSize: 28,
@@ -356,57 +315,15 @@ const styles = StyleSheet.create({
     color: "#111827",
     marginBottom: 8,
     letterSpacing: -0.4,
-    textAlign: "center",
-    alignSelf: "stretch",
+    textAlign: "left",
   },
   hint: {
     fontSize: 14,
     color: "#6b7280",
     lineHeight: 20,
-    textAlign: "center",
+    textAlign: "left",
     marginBottom: 16,
-    alignSelf: "stretch",
   },
-  newListCard: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    ...cardShadow,
-  },
-  newListLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#4b5563",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  newListInput: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    fontSize: 16,
-    color: "#111827",
-    backgroundColor: "#f9fafb",
-    marginBottom: 10,
-  },
-  createButton: {
-    backgroundColor: "#111827",
-    height: 46,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  createButtonPressed: { opacity: 0.88 },
-  createButtonDisabled: { opacity: 0.5 },
-  createButtonText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   noticeError: {
     backgroundColor: "#fef2f2",
     borderRadius: 12,
@@ -416,133 +333,13 @@ const styles = StyleSheet.create({
     borderColor: "#fecaca",
     width: "100%",
   },
-  errorText: { color: "#b91c1c", fontSize: 14 },
+  errorText: { color: "#b91c1c", fontSize: 14, textAlign: "left" },
   spinner: { marginVertical: 24 },
-  emptyCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderStyle: "dashed",
+  gridWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     width: "100%",
-    ...cardShadow,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: "#6b7280",
-    textAlign: "center",
-    lineHeight: 22,
-  },
-  card: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    overflow: "hidden",
-    ...cardShadow,
+    alignItems: "flex-start",
   },
-  cardMain: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    gap: 12,
-  },
-  cardMainPressed: { opacity: 0.9 },
-  cardText: { flex: 1, minWidth: 0 },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  cardMeta: {
-    fontSize: 13,
-    color: "#6b7280",
-    marginTop: 4,
-  },
-  countPill: {
-    minWidth: 28,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "#111827",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  countPillText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  openArrow: {
-    fontSize: 18,
-    color: "#2563eb",
-    fontWeight: "600",
-  },
-  cardActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 20,
-    paddingHorizontal: 14,
-    paddingBottom: 12,
-    paddingTop: 0,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#f3f4f6",
-  },
-  actionLink: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#2563eb",
-  },
-  actionDanger: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#b91c1c",
-  },
-  editBlock: {
-    paddingHorizontal: 14,
-    paddingBottom: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#f3f4f6",
-    gap: 8,
-  },
-  renameInput: {
-    height: 44,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    color: "#111827",
-    backgroundColor: "#f9fafb",
-    marginTop: 8,
-  },
-  editActions: {
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "flex-end",
-  },
-  smallButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: "#111827",
-    minWidth: 72,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  smallButtonPressed: { opacity: 0.88 },
-  smallButtonText: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  smallButtonGhost: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
-  },
-  smallButtonGhostPressed: { opacity: 0.85 },
-  smallButtonGhostText: { color: "#374151", fontSize: 14, fontWeight: "600" },
 });
