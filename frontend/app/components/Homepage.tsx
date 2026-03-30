@@ -6,6 +6,7 @@ import { Manga } from "../types/types";
 import SearchBar from "./SearchBar";
 import { type Href, useRouter } from "expo-router";
 import type { MangaSearchListJson } from "@/lib/apiTypes";
+import GenreMenu from "./GenreMenu";
 
 import { BACKEND_URL } from "../config";
 
@@ -81,6 +82,8 @@ export default function Index() {
       />
 
       <MangaCarousel data={popularManga} />
+
+      <GenreMenu />
 
       <MangaCategoryList title="Recently Updated" data={recentManga} />
 

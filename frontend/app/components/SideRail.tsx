@@ -27,6 +27,7 @@ export default function SideRail() {
   const isBookmarks =
     pathname === "/bookmarks" || pathname.startsWith("/reading-list");
   const isProfile = pathname === "/profile";
+  const isBrowse = pathname === "/browse" || pathname.startsWith("/browse"); 
 
   return (
     <View
@@ -72,6 +73,24 @@ export default function SideRail() {
           name="search"
           size={ICON_SZ}
           color={isSearch ? ICON_ACTIVE : ICON_COLOR}
+        />
+      </Pressable>
+
+      <View style={styles.underHomeGap} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Browse manga"
+        onPress={() => router.push("/browse" as Href)}
+        style={({ pressed }) => [
+          styles.item,
+          isBrowse && styles.itemActive,
+          pressed && styles.itemPressed,
+        ]}
+      >
+        <Ionicons
+          name="grid" // You could also use "compass-outline" or "library-outline"
+          size={ICON_SZ}
+          color={isBrowse ? ICON_ACTIVE : ICON_COLOR}
         />
       </Pressable>
 
