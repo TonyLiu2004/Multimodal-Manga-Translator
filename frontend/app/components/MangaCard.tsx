@@ -24,7 +24,7 @@ const MangaCard: React.FC<MangaCardProps> = ({ manga, width, height }) => {
   const coverArt = manga.relationships?.find((rel) => rel.type === "cover_art");
   const fileName = coverArt?.attributes?.fileName;
   const coverUrl = fileName
-    ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}.256.jpg`
+    ? `${BACKEND_URL}/api/manga/cover_art?manga_id=${manga.id}&file_name=${fileName}&size=256` //`https://uploads.mangadex.org/covers/${manga.id}/${fileName}.256.jpg`
     : "https://via.placeholder.com/256x360?text=No+Cover";
 
   const fetchChapters = async (mangaId: string) => {
