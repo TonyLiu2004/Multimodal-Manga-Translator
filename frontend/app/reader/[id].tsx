@@ -6,7 +6,7 @@ import MangaReader from '../components/MangaReader';
 
 import { BACKEND_URL } from "../config";
 
-const IS_TESTING = true; // true for testing with local images
+const IS_TESTING = false; // true for testing with local images
 
 export default function ReaderScreen() {
     const { id } = useLocalSearchParams();
@@ -26,8 +26,25 @@ export default function ReaderScreen() {
 
     // Placeholder
     const runBackend = async () => {
-        const res = await fetch(`${BACKEND_URL}/api/manga/chapter/${id}/pages`);
-        const json = await res.json();
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/manga/chapter/${id}/pages`);
+
+            if (!res.ok) {
+                throw new Error(`Server responded with ${res.status}`);
+            }
+
+            const json = await res.json();
+
+            if (json.urls && Array.isArray(json.urls)) {
+                setPages(json.urls);
+            } else {
+                console.warn("Backend returned no URLs for this chapter.");
+                setPages([]);
+            }
+        } catch (error) {
+            console.error("Error fetching chapter pages:", error);
+            setPages([]);
+        }
     }
 
     useEffect(() => {
