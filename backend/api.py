@@ -264,13 +264,13 @@ def patch_me_display_name(ctx: CurrentAuthContext, body: UserDisplayNamePatchIn)
 ###########
 ###########
 
-@router.get("/api/manga/chapter/{chapter_id}/page/{page_index}")
-async def proxy_manga_page(chapter_id: str, page_index: int):
-    urls = mangadex_service.get_chapter_panel_urls(chapter_id)
-    if not urls or page_index >= len(urls):
-        return {"error": "Page not found"}, 404
+# @router.get("/api/manga/chapter/{chapter_id}/page/{page_index}")
+# async def proxy_manga_page(chapter_id: str, page_index: int):
+#     urls = mangadex_service.get_chapter_panel_urls(chapter_id)
+#     if not urls or page_index >= len(urls):
+#         return {"error": "Page not found"}, 404
 
-    return await proxy.get_manga_page_stream(urls[page_index])
+#     return await proxy.get_manga_page_stream(urls[page_index])
 
 
 @router.get("/api/proxy/image")

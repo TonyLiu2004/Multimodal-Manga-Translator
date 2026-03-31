@@ -8,6 +8,7 @@ import torch
 from pathlib import Path
 from helpers import get_project_root, setup_fonts
 from manga_ocr import MangaOcr
+import httpx
 
 class ImageProcessor:
     def __init__(self, bubble_detector, ocr_model, translate_model):
@@ -15,18 +16,41 @@ class ImageProcessor:
         self.ocr_model = ocr_model
         self.translate_model = translate_model
 
+    async def download_and_process(self, image_url: str, language: str):
+        # Create a temporary file that stays on disk until we close it
+        # 'delete=False' is important because some ML models need the file to stay closed/flushed before they can read it.
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            temp_path = tmp.name
+            
+            # Download
+            async with httpx.AsyncClient() as client:
+                response = await client.get(image_url)
+                response.raise_for_status()
+                tmp.write(response.content)
+                tmp.flush()
+
+        try:
+            results = self.process_image(temp_path, language)
+            return results
+
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                print(f"Cleaned up temp file: {temp_path}")
+
     def process_image(self, image_path, language):
         bubble_results = self.bubble_detector_model.predict(image_path)
         print(f"bubble results: {bubble_results}")
         img = Image.open(image_path)
-        draw = ImageDraw.Draw(img)
+        width, height = img.size
+        # draw = ImageDraw.Draw(img)
 
         texts = []
         coordinates={}
         i=0
         for box_data in bubble_results:
             coords = box_data['coords']
-            draw.rectangle(coords, outline="red", width=1)
+            # draw.rectangle(coords, outline="red", width=1)
             box_cropped = img.crop(coords)
             # box_cropped = upscale_for_ocr(box_cropped, scale=3)
             # box_cropped.show()
@@ -71,6 +95,8 @@ class ImageProcessor:
 
             bubble_data.append({
                 "bubble_index": i,
+                "width": width,
+                "height": height,
                 "x1": float(x1), "y1": float(y1), "x2": float(x2), "y2": float(y2),
                 "original_text": original_text,
                 "translated_text": translated_text,

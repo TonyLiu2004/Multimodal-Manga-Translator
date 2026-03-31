@@ -34,7 +34,6 @@ export default function ReaderScreen() {
             }
 
             const json = await res.json();
-            console.log(json)
             if (json.urls && Array.isArray(json.urls)) {
                 setPages(json.urls);
             } else {
