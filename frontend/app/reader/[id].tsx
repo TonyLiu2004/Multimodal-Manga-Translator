@@ -4,6 +4,8 @@ import { ActivityIndicator, View } from 'react-native';
 import resolveAssetSource from 'react-native/Libraries/Image/resolveAssetSource';
 import MangaReader from '../components/MangaReader'; 
 
+import { BACKEND_URL } from "../config";
+
 const IS_TESTING = true; // true for testing with local images
 
 export default function ReaderScreen() {
@@ -23,7 +25,10 @@ export default function ReaderScreen() {
     };
 
     // Placeholder
-    const runBackend = async () => {}
+    const runBackend = async () => {
+        const res = await fetch(`${BACKEND_URL}/api/manga/chapter/${id}/pages`);
+        const json = await res.json();
+    }
 
     useEffect(() => {
         const fetchPages = async () => {

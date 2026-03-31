@@ -42,6 +42,8 @@ from db.schemas import (
 
 router = APIRouter()
 
+BACKEND_URL = "https://tonyliu404-manglify-backend.hf.space"
+
 @router.get("/")
 def root():
     """API root - confirms the API is running."""
@@ -271,19 +273,30 @@ async def proxy_manga_page(chapter_id: str, page_index: int):
     return await proxy.get_manga_page_stream(urls[page_index])
 
 
+@router.get("/api/proxy/image")
+async def proxy_image(target_url: str):
+    return await proxy.get_manga_page_stream(target_url)
+
 @router.get("/api/manga/chapter/{chapter_id}/pages")
 def get_chapter_page_urls(chapter_id: str):
     """MangaDex at-home CDN URLs for every page in a chapter (for client readers)."""
     urls = mangadex_service.get_chapter_panel_urls(chapter_id)
     if not urls:
         raise HTTPException(status_code=404, detail="No pages for this chapter")
-    return {"urls": urls}
+    
+    proxied_urls = [
+        f"{BACKEND_URL}/api/proxy/image?target_url={url}" 
+        for url in urls
+    ]
+
+    print(proxied_urls)
+    return {"urls": proxied_urls}
 
 @router.get("/api/manga/cover_art")
 async def proxy_manga_cover_art(manga_id: str, file_name: str, size: int = 256):
     url = f"https://uploads.mangadex.org/covers/{manga_id}/{file_name}.{size}.jpg"
     print(url)
-    return await proxy.get_manga_page_stream(url)
+    return await proxy_image(url)
 
 
 @router.get("/api/manga/{manga_id}/cover")
