@@ -95,11 +95,6 @@ export default function PopUp({
     (ch) => selectedLanguage === "All" || ch.language === selectedLanguage,
   );
 
-  // console.log("Available languages:", manga.attributes.availableTranslatedLanguages);
-  // console.log("Selected language:", selectedLanguage);
-  // console.log("Filtered chapters:", filteredChapters);
-  // console.log("Chapter data:", chapters[0]);
-
   return (
     <Modal
       visible={visible}
@@ -114,7 +109,8 @@ export default function PopUp({
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.summary}>{summary}</Text>
 
-            {session?.access_token ? (
+            <View style={styles.card}>
+              {session?.access_token ? (
               <View style={styles.readingListBlock}>
                 <Text style={styles.listPickerLabel}>Add to list</Text>
                 {listsLoading ? (
@@ -231,7 +227,9 @@ export default function PopUp({
                   <Text style={styles.signInCtaBtnText}>Sign in</Text>
                 </Pressable>
               </View>
-            )}
+            )}</View>
+
+            
 
             <View style={styles.chaptersSection}>
               <Text style={styles.chaptersTitle}>Chapters</Text>
@@ -344,6 +342,12 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: "#666",
     marginBottom: 20,
+  },
+  card: { 
+    padding: 15, 
+    backgroundColor: "#f4f4f4", 
+    borderRadius: 12, 
+    marginBottom: 20 
   },
   readingListBlock: {
     marginBottom: 16,
