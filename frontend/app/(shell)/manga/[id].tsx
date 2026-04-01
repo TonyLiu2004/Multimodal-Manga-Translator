@@ -97,7 +97,8 @@ export default function MangaDetailsPage() {
     const json = await res.json();
     
     if (json.cover_url) {
-      setCoverUrl(json.cover_url);
+      const proxiedUrl = `${BACKEND_URL}/api/proxy/image?target_url=${encodeURIComponent(json.cover_url)}`;
+      setCoverUrl(proxiedUrl);
     }
   } catch (e) {
     console.error("Failed to fetch cover JSON", e);
