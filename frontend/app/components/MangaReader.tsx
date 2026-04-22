@@ -54,7 +54,7 @@ export default function MangaReader({ pages }: MangaReaderProps) {
             },
         });
         const json = await res.json();
-        console.log(json);
+        // console.log(json);
 
         if (json?.status === 'success' && Array.isArray(json?.data)) {
             setTranslationsByPage((prev) => ({

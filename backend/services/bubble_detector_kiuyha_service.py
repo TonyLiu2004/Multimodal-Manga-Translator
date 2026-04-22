@@ -52,6 +52,8 @@ class Bubble_Detector_Kiuyha_Service:
                 'center_y': (pad_y1 + pad_y2) / 2
             })
 
+        boxes_list = self._dedupe_similar_boxes(boxes_list, coord_similarity_threshold=0.15)
+
         #sort right to left, top to bottom. test more
         row_height = img_h * 0.1 
 
@@ -63,6 +65,32 @@ class Bubble_Detector_Kiuyha_Service:
             )
         )
         return sorted_boxes
+
+    def _dedupe_similar_boxes(self, boxes_list, coord_similarity_threshold=0.08):
+        deduped = []
+        for candidate in boxes_list:
+            is_duplicate = any(
+                self._are_boxes_similar(existing['coords'], candidate['coords'], coord_similarity_threshold)
+                for existing in deduped
+            )
+            if not is_duplicate:
+                deduped.append(candidate)
+        return deduped
+
+    def _are_boxes_similar(self, box_a, box_b, threshold):
+        ax1, ay1, ax2, ay2 = box_a
+        bx1, by1, bx2, by2 = box_b
+
+        width_ref = max((ax2 - ax1), (bx2 - bx1), 1e-6)
+        height_ref = max((ay2 - ay1), (by2 - by1), 1e-6)
+
+        rel_diffs = [
+            abs(ax1 - bx1) / width_ref,
+            abs(ax2 - bx2) / width_ref,
+            abs(ay1 - by1) / height_ref,
+            abs(ay2 - by2) / height_ref,
+        ]
+        return all(diff <= threshold for diff in rel_diffs)
     
     def load_model(self):
         target_path = self.base_model_path / "kiuyha.pt"

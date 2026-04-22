@@ -40,7 +40,7 @@ class ImageProcessor:
 
     def process_image(self, image_path, language):
         bubble_results = self.bubble_detector_model.predict(image_path)
-        print(f"bubble results: {bubble_results}")
+        # print(f"bubble results: {bubble_results}")
         img = Image.open(image_path)
         width, height = img.size
         # draw = ImageDraw.Draw(img)
