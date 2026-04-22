@@ -323,6 +323,7 @@ async def get_popular_manga(
     cover_art: bool = True,
     includedTags: list[str] = Query(default=[]),
     excludedTags: list[str] = Query(default=[]),
+    status: str = "",
 ):
     results = await mangadex_service.search_manga(
         title=title,
@@ -333,6 +334,7 @@ async def get_popular_manga(
         cover_art=cover_art,
         included_tags=includedTags,
         excluded_tags=excludedTags,
+        status=status or None,
     )
     return results
 

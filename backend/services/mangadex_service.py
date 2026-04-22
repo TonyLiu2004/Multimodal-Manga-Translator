@@ -96,6 +96,7 @@ async def search_manga(
     cover_art: bool = True,
     included_tags: list[str] | None = None,
     excluded_tags: list[str] | None = None,
+    status: str | None = None,
 ):
     """Search MangaDex manga with optional tag filtering."""
 
@@ -119,6 +120,11 @@ async def search_manga(
 
     for tag_id in (excluded_tags or []):
         params.append(("excludedTags[]", tag_id))
+
+    if status:
+        params.append(("status[]", status))
+
+    params.append(("contentRating[]", "safe"))
 
     async with httpx.AsyncClient() as client:
         try:

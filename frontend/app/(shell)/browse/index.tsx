@@ -11,9 +11,10 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { BACKEND_URL } from "@/config";
 import MangaCard from "@/app/components/MangaCard";
-import MangaBrowserCard from "@/app/components/MangaBrowserCard";
+import MangaBrowseCard from "@/app/components/MangaBrowseCard";
 import { Manga } from "@/lib/mangaTypes";
 import GenreMenu from "@/app/components/GenreMenu";
+import { SORT_MAP } from "@/app/components/filter_tags";
 
 const ITEMS_PER_PAGE = 24;
 
@@ -25,46 +26,60 @@ const BrowsePage = () => {
   // Reference for scrolling to top
   const flatListRef = useRef<FlatList>(null);
 
-  const [filters, setFilters] = useState({
-    genreId: genreId || "",
-    status: "",
-  });
+  const [selectedGenreId, setSelectedGenreId] = useState<string>(
+    genreId ? (genreId as string) : ""
+  );
+  const [selectedSortId, setSelectedSortId] = useState("followedCount_desc");
+  const [selectedStatusId, setSelectedStatusId] = useState<string>("");
 
   const [page, setPage] = useState(1);
   const [manga, setManga] = useState<Manga[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const numColumns = isMobile ? 1 : 6;
+  const numColumns = isMobile ? 1 : 2;
   const cardWidth = 200;
   const cardHeight = 300;
 
   useEffect(() => {
     fetchFilteredManga();
-
-    // Scroll to top whenever page or filters change
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-  }, [filters, page]);
+  }, [selectedGenreId, selectedSortId, selectedStatusId, page]);
 
   useEffect(() => {
     if (genreId) {
-      setFilters((prev) => ({ ...prev, genreId: genreId as string }));
-      setPage(1); // Reset to first page on new genre selection
+      setSelectedGenreId(genreId as string);
+      setPage(1);
     }
   }, [genreId]);
+
+  const handleGenreChange = (id: string) => {
+    setSelectedGenreId(id);
+    setPage(1);
+  };
+
+  const handleSortChange = (id: string) => {
+    setSelectedSortId(id);
+    setPage(1);
+  };
+
+  const handleStatusChange = (id: string) => {
+    setSelectedStatusId((prev) => (prev === id ? "" : id));
+    setPage(1);
+  };
 
   const fetchFilteredManga = async () => {
     setLoading(true);
     const offset = (page - 1) * ITEMS_PER_PAGE;
 
+    const sort = SORT_MAP[selectedSortId] ?? { order_by: "followedCount", order_direction: "desc" };
     const params = new URLSearchParams({
       limit: ITEMS_PER_PAGE.toString(),
       offset: offset.toString(),
-      order_by: "followedCount",
-      order_direction: "desc",
+      order_by: sort.order_by,
+      order_direction: sort.order_direction,
     });
-    if (filters.genreId) {
-      params.append("includedTags", filters.genreId as string);
-    }
+    if (selectedGenreId) params.append("includedTags", selectedGenreId);
+    if (selectedStatusId) params.append("status", selectedStatusId);
     const query = params.toString();
 
     try {
@@ -116,7 +131,14 @@ const BrowsePage = () => {
 
   return (
     <View style={styles.container}>
-      <GenreMenu selectedGenreId={filters.genreId as string} />
+      <GenreMenu
+        selectedGenreId={selectedGenreId}
+        onGenreChange={handleGenreChange}
+        selectedSortId={selectedSortId}
+        onSortChange={handleSortChange}
+        selectedStatusId={selectedStatusId}
+        onStatusChange={handleStatusChange}
+      />
 
       {loading && page === 1 ? (
         <View style={styles.centered}>
@@ -129,15 +151,13 @@ const BrowsePage = () => {
           key={numColumns}
           numColumns={numColumns}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={isMobile ? styles.listContainer : styles.gridContainer}
+          contentContainerStyle={styles.listContainer}
           columnWrapperStyle={isMobile ? undefined : styles.columnWrapper}
-          renderItem={({ item }) =>
-            isMobile ? (
-              <MangaBrowserCard manga={item} />
-            ) : (
-              <MangaCard manga={item} width={cardWidth} height={cardHeight} />
-            )
-          }
+          renderItem={({ item }) => (
+            <View style={!isMobile && styles.webCardWrapper}>
+              <MangaBrowseCard manga={item} />
+            </View>
+          )}
           ListEmptyComponent={<Text style={styles.empty}>No manga found.</Text>}
           ListFooterComponent={renderPagination}
         />
@@ -149,9 +169,9 @@ const BrowsePage = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "white" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  gridContainer: { width: "100%", paddingHorizontal: 10, paddingBottom: 20 },
   listContainer: { width: "100%", paddingBottom: 20 },
-  columnWrapper: { justifyContent: "center", gap: 20, marginBottom: 20 },
+  columnWrapper: { gap: 0, marginBottom: 0 },
+  webCardWrapper: { flex: 1 },
   empty: { color: "#888", textAlign: "center", marginTop: 50 },
 
   paginationContainer: {

@@ -82,8 +82,6 @@ export default function Index() {
 
       <MangaCarousel data={popularManga} />
 
-      <GenreMenu />
-
       <MangaCategoryList title="Recently Updated" data={recentManga} />
 
       <MangaCategoryList title="Action" data={actionManga} />
