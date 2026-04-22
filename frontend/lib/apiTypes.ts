@@ -2,7 +2,7 @@
  * JSON shapes shared with the FastAPI backend / MangaDex-style proxies.
  * Keep in sync when backend response contracts change.
  */
-import type { Manga } from "@/app/types/types";
+import type { Manga } from "@/lib/mangaTypes";
 
 /** GET /api/manga/search and similar endpoints return a MangaDex-shaped payload. */
 export type MangaSearchListJson = {

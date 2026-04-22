@@ -101,6 +101,31 @@ else:
 processor = ImageProcessor(bubble_detector_model, ocr_model, translate_model)
 print("Finished loading all models and fonts")
 
+def show_boxes(image_path):
+    result = bubble_detector_model.predict(image_path)
+    img = Image.open(image_path).convert("RGB")
+    draw = ImageDraw.Draw(img)
+    print(result)
+    for box in result:
+        # Get coordinates as a list of floats
+        coords = box['coords']#.xyxy[0].tolist() # [x1, y1, x2, y2]
+        draw.rectangle(coords, outline="red", width=1)
+
+        # label
+        # conf = box.conf[0].item()
+        box_cropped = img.crop(coords)
+        # box_cropped = upscale_for_ocr(box_cropped, scale=3)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
+            box_cropped.save(f.name)
+            temp_path = f.name
+        draw.text(
+            (coords[0], coords[1] - 10),
+            "b",
+            fill="red",
+            font=font
+        )
+    img.show()
+
 ###
 ###
 ###
@@ -134,6 +159,8 @@ async def translate_manga_panel(image_url: str, language: str = ""):
         print(f"Translation Route Error: {e}")
     
 if __name__ == "__main__":
+    # processor.process_image("../test_images/test_3.png", "")
+    # show_boxes("../test_images/test_3.png")
     port = int(os.environ.get("PORT", 8000))
     print(f"--- Starting Production Server on Port {port} ---")
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

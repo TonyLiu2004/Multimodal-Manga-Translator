@@ -2,13 +2,13 @@ import { Text, ScrollView, StyleSheet } from "react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import MangaCarousel from "./MangaCarousel";
 import MangaCategoryList from "./MangaCategoryList";
-import { Manga } from "../types/types";
+import { Manga } from "@/lib/mangaTypes";
 import SearchBar from "./SearchBar";
 import { type Href, useRouter } from "expo-router";
 import type { MangaSearchListJson } from "@/lib/apiTypes";
 import GenreMenu from "./GenreMenu";
 
-import { BACKEND_URL } from "../config";
+import { BACKEND_URL } from "@/config";
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");

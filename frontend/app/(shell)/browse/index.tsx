@@ -9,9 +9,10 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { BACKEND_URL } from "../../config";
+import { BACKEND_URL } from "@/config";
+import MangaCard from "@/app/components/MangaCard";
 import MangaBrowseCard from "@/app/components/MangaBrowseCard";
-import { Manga } from "@/app/types/types";
+import { Manga } from "@/lib/mangaTypes";
 import GenreMenu from "@/app/components/GenreMenu";
 import { SORT_MAP } from "@/app/components/filter_tags";
 

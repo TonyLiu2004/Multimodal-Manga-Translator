@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import React from "react";
-import { Chapter, Manga } from "../types/types";
+import { Chapter, Manga } from "@/lib/mangaTypes";
 import { useAuth } from "@/context/AuthContext";
 import {
   addToReadingList,

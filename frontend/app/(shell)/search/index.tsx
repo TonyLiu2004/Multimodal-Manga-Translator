@@ -8,8 +8,8 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import SearchBar from "@/app/components/SearchBar";
 import SearchResults from "@/app/components/SearchResults";
-import { BACKEND_URL } from "@/app/config";
-import type { Manga } from "@/app/types/types";
+import { BACKEND_URL } from "@/config";
+import type { Manga } from "@/lib/mangaTypes";
 import type { MangaSearchListJson } from "@/lib/apiTypes";
 
 function searchParamToString(v: string | string[] | undefined): string {

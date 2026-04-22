@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from "react-native";
 import MangaCard from "./MangaCard";
-import { Manga } from "../types/types";
+import { Manga } from "@/lib/mangaTypes";
 
 interface SearchResultsProps {
   mangaList: Manga[];

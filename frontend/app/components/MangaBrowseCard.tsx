@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { View, Image, Text, Pressable, StyleSheet } from "react-native";
-import { Manga, Chapter } from "../types/types";
+import { Manga, Chapter } from "../../lib/mangaTypes";
 import PopUp from "./PopUp";
-import { BACKEND_URL } from "../config";
+import { BACKEND_URL } from "@/config";
 
 interface MangaBrowseCardProps {
   manga: Manga;
@@ -13,7 +13,7 @@ const MangaBrowseCard: React.FC<MangaBrowseCardProps> = ({ manga }) => {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loadingChapters, setLoadingChapters] = useState(false);
 
-  const coverRel = manga.relationships?.find((r) => r.type === "cover_art");
+  const coverRel = manga.relationships?.find((r: { type: string }) => r.type === "cover_art");
   const fileName = coverRel?.attributes?.fileName;
   const coverUrl = fileName
     ? `${BACKEND_URL}/api/manga/cover_art?manga_id=${manga.id}&file_name=${fileName}&size=256`

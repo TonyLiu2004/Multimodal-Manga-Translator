@@ -14,7 +14,7 @@ import { type Href, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PopUp from "@/app/components/PopUp";
 import { useAuth } from "@/context/AuthContext";
-import type { Chapter, Manga } from "@/app/types/types";
+import type { Chapter, Manga } from "@/lib/mangaTypes";
 import {
   fetchReadingListItems,
   removeReadingListItem,
