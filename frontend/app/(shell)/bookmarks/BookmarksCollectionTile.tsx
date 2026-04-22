@@ -13,7 +13,7 @@ import {
   BOOKMARK_GRID,
   BOOKMARKS_COVER_PLACEHOLDER,
   bookmarkCardShadow,
-} from "./bookmarkGridConstants";
+} from "@/lib/bookmarkGridConstants";
 
 export type BookmarksCollectionTileProps = {
   collection: ReadingListCollection;

@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, FlatList, StyleSheet } from "react-native";
 import MangaCard from "./MangaCard";
-import { Manga } from "../types/types";
+import { Manga } from "@/lib/mangaTypes";
 
 interface MangaCategoryListProps {
   title: string;

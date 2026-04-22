@@ -2,7 +2,7 @@ import React from "react";
 import { View, useWindowDimensions, StyleSheet } from "react-native";
 import Carousel, { ICarouselInstance } from "react-native-reanimated-carousel";
 import MangaCard from "./MangaCard";
-import { Manga } from "../types/types";
+import { Manga } from "@/lib/mangaTypes";
 
 interface MangaCarouselProps {
   data: Manga[];

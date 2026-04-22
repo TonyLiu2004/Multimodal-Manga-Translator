@@ -10,7 +10,7 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { BACKEND_URL } from "../../config";
 import MangaCard from "@/app/components/MangaCard";
-import { Manga } from "@/app/types/types";
+import { Manga } from "@/lib/mangaTypes";
 import GenreMenu from "@/app/components/GenreMenu";
 
 const ITEMS_PER_PAGE = 24;

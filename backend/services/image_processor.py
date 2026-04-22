@@ -104,30 +104,38 @@ class ImageProcessor:
 
             ######### Code for drawing translated text onto manga panel directly) ###########
 
-            # #wipe the space
-            # draw.rectangle(coords, fill="white", outline="white")
+            #wipe the space
+        #     draw.rectangle(coords, fill="white", outline="white")
 
-            # # 1. Calculate the best fit
-            # lines, best_font, final_size, line_h = fit_text_to_box(draw, translated_text, coords, FONT_PATH)
+        #     ROOT = get_project_root()
+        #     env_font = os.getenv("FONT_PATH")
+        #     if env_font:
+        #         FONT_PATH = Path(env_font) / "NotoSansCJK.ttc"
+        #     else:
+        #         FONT_PATH = ROOT / "backend" / "fonts" / "NotoSansCJK.ttc"
 
-            # # Calculate total height of the block
-            # total_h = line_h * len(lines)
+        #     # 1. Calculate the best fit
+        #     lines, best_font, final_size, line_h = fit_text_to_box(draw, translated_text, coords, FONT_PATH)
 
-            # # Start_y adjusted for the block height relative to the box center
-            # start_y = coords[1] + ((coords[3] - coords[1]) - total_h) / 2
+        #     # Calculate total height of the block
+        #     total_h = line_h * len(lines)
 
-            # # 3. Draw each line centered horizontally
-            # for line in lines:
-            #     line = line.strip()
-            #     if not line: continue
+        #     # Start_y adjusted for the block height relative to the box center
+        #     start_y = coords[1] + ((coords[3] - coords[1]) - total_h) / 2
 
-            #     # Horizontal Centering
-            #     line_w = draw.textlength(line, font=best_font)
-            #     start_x = coords[0] + ((coords[2] - coords[0]) - line_w) / 2
+        #     # 3. Draw each line centered horizontally
+        #     for line in lines:
+        #         line = line.strip()
+        #         if not line: continue
 
-            #     draw.text((start_x, start_y), line, font=best_font, fill="black")
-            #     start_y += line_h
+        #         # Horizontal Centering
+        #         line_w = draw.textlength(line, font=best_font)
+        #         start_x = coords[0] + ((coords[2] - coords[0]) - line_w) / 2
 
+        #         draw.text((start_x, start_y), line, font=best_font, fill="black")
+        #         start_y += line_h
+
+        # img.show()
         return bubble_data #img, bubble_data
     
 
@@ -199,112 +207,3 @@ class ImageProcessor:
 #         current_size -= 2 # Step down by 2 for speed
 
 #     return lines, font, current_size, line_height
-
-# def upscale_for_ocr(img, scale=2):
-#     w, h = img.size
-#     return img.resize((w*scale, h*scale), Image.BICUBIC)
-
-# def process_image(image_path, language):
-#     bubble_results = bubble_detector_model.predict(image_path)
-#     print(f"bubble results: {bubble_results}")
-#     img = Image.open(image_path)
-#     draw = ImageDraw.Draw(img)
-
-#     texts = []
-#     coordinates={}
-#     i=0
-#     for box_data in bubble_results:
-#         coords = box_data['coords']
-#         draw.rectangle(coords, outline="red", width=1)
-#         box_cropped = img.crop(coords)
-#         # box_cropped = upscale_for_ocr(box_cropped, scale=3)
-#         # box_cropped.show()
-
-#         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f:
-#             box_cropped.save(f.name)
-#             temp_path = f.name
-
-#         text = ""
-#         # if language == "japanese":
-#         #     # text = ocr_japanese_model.runOCR(temp_path)
-#         #     text = ocr_model(temp_path)
-#         # else:
-#         #     text = ocr_model.runOCR(temp_path)
-
-#         text = ocr_model(box_cropped) 
-
-#         text = re.sub(r'[\n\r\u2028\u2029]+', ' ', text) #remove new lines
-#         texts.append({"id": i, "text": text})
-#         coordinates[i] = coords
-#         i+=1
-#     print(f'OCR Complete, total {len(texts)} bubbles.')
-
-#     #add translated text to manga image
-#     try:
-#         print("Translating with cloud Qwen model...")
-#         translated = translate_model.translate_cloud(texts)
-#     except Exception as e:
-#         print("API translation failed with Qwen, falling back to local model...")
-#         translated = translate_model.translate(texts)
-
-#     print(translated)
-
-#     bubble_data = []
-#     for i in range(len(texts)):
-#         coords = coordinates[i]
-#         x1, y1, x2, y2 = coords
-#         original_text = texts[i]["text"]
-#         translated_text = translated.get(str(i), translated.get(i, ""))
-#         if not isinstance(translated_text, str):
-#             translated_text = str(translated_text)
-#         print(f"{i}: {original_text}")
-#         print(translated_text)
-#         print("==================================")
-
-#         bubble_data.append({
-#             "bubble_index": i,
-#             "x1": float(x1), "y1": float(y1), "x2": float(x2), "y2": float(y2),
-#             "original_text": original_text,
-#             "translated_text": translated_text,
-#         })
-
-#         #wipe the space
-#         draw.rectangle(coords, fill="white", outline="white")
-
-#         # 1. Calculate the best fit
-#         lines, best_font, final_size, line_h = fit_text_to_box(draw, translated_text, coords, FONT_PATH)
-
-#         # Calculate total height of the block
-#         total_h = line_h * len(lines)
-
-#         # Start_y adjusted for the block height relative to the box center
-#         start_y = coords[1] + ((coords[3] - coords[1]) - total_h) / 2
-
-#         # 3. Draw each line centered horizontally
-#         for line in lines:
-#             line = line.strip()
-#             if not line: continue
-
-#             # Horizontal Centering
-#             line_w = draw.textlength(line, font=best_font)
-#             start_x = coords[0] + ((coords[2] - coords[0]) - line_w) / 2
-
-#             draw.text((start_x, start_y), line, font=best_font, fill="black")
-#             start_y += line_h
-
-#     return img, bubble_data
-
-# def translate_text(text, language):
-#     # translated_text = ""
-#     # if language == "japanese":
-#     #     translated_text =
-
-#     translated_text = translate_model.translate(text)
-
-#     return translated_text
-
-# def _language_to_code(language: str) -> str:
-#     """Map language name to ISO 639-1 style code for DB."""
-#     m = {"japanese": "ja", "english": "en", "korean": "ko", "chinese": "zh"}
-#     return m.get(language.lower(), language[:2] if len(language) >= 2 else "ja")
-

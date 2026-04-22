@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
+import { Asset } from 'expo-asset';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import resolveAssetSource from 'react-native/Libraries/Image/resolveAssetSource';
 import MangaReader from '../components/MangaReader'; 
 
 import { BACKEND_URL } from "../config";
@@ -15,10 +15,10 @@ export default function ReaderScreen() {
 
     const runTest = async () => {
         const testPages = [
-            resolveAssetSource(require('../../assets/images/test_1.png')).uri,
-            resolveAssetSource(require('../../assets/images/test_7.png')).uri,
-            resolveAssetSource(require('../../assets/images/cntest_1.png')).uri,
-            resolveAssetSource(require('../../assets/images/krtest_1.png')).uri,
+            Asset.fromModule(require('../../assets/images/test_1.png')).uri,
+            Asset.fromModule(require('../../assets/images/test_7.png')).uri,
+            Asset.fromModule(require('../../assets/images/cntest_1.png')).uri,
+            Asset.fromModule(require('../../assets/images/krtest_1.png')).uri,
         ];
 
         setPages(testPages);

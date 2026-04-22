@@ -5,7 +5,7 @@ import {
   Pressable,
   StyleSheet,
 } from "react-native";
-import { Manga, Chapter } from "../types/types";
+import { Manga, Chapter } from "@/lib/mangaTypes";
 import PopUp from "./PopUp";
 
 import { BACKEND_URL } from "../config";

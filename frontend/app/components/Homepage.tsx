@@ -2,7 +2,7 @@ import { Text, ScrollView, StyleSheet } from "react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import MangaCarousel from "./MangaCarousel";
 import MangaCategoryList from "./MangaCategoryList";
-import { Manga } from "../types/types";
+import { Manga } from "@/lib/mangaTypes";
 import SearchBar from "./SearchBar";
 import { type Href, useRouter } from "expo-router";
 import type { MangaSearchListJson } from "@/lib/apiTypes";

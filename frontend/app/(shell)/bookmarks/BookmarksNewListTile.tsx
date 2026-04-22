@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { BOOKMARK_GRID, bookmarkCardShadow } from "./bookmarkGridConstants";
+import { BOOKMARK_GRID, bookmarkCardShadow } from "@/lib/bookmarkGridConstants";
 
 export type BookmarksNewListTileProps = {
   creating: boolean;

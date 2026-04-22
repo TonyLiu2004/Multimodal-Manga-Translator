@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { bookmarkCardShadow } from "./bookmarkGridConstants";
+import { bookmarkCardShadow } from "@/lib/bookmarkGridConstants";
 
 export type CreateReadingListModalProps = {
   visible: boolean;
