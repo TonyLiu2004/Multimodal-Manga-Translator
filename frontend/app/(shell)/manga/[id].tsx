@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import { BACKEND_URL } from "../../config"; 
+import { BACKEND_URL } from "@/config";
 import { Manga, Chapter } from "@/lib/mangaTypes";
 import { useAuth } from "@/context/AuthContext";
 import {

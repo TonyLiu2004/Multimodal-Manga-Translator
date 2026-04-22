@@ -1,4 +1,4 @@
-import { BACKEND_URL } from "@/app/config";
+import { BACKEND_URL } from "@/config";
 
 export type ReadingListCollection = {
   id: number;

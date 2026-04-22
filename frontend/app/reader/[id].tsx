@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import MangaReader from '../components/MangaReader'; 
 
-import { BACKEND_URL } from "../config";
+import { BACKEND_URL } from "@/config";
 
 const IS_TESTING = false; // true for testing with local images
 

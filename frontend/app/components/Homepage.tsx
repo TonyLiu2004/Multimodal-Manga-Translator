@@ -8,7 +8,7 @@ import { type Href, useRouter } from "expo-router";
 import type { MangaSearchListJson } from "@/lib/apiTypes";
 import GenreMenu from "./GenreMenu";
 
-import { BACKEND_URL } from "../config";
+import { BACKEND_URL } from "@/config";
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");

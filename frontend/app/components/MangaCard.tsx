@@ -9,7 +9,7 @@ import {
 import { Manga, Chapter } from "@/lib/mangaTypes";
 import PopUp from "./PopUp";
 
-import { BACKEND_URL } from "../config";
+import { BACKEND_URL } from "@/config";
 
 interface MangaCardProps {
   manga: Manga;

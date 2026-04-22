@@ -1,4 +1,4 @@
-import { BACKEND_URL } from "@/app/config";
+import { BACKEND_URL } from "@/config";
 
 /** Resolve MangaDex catalog id to a 256px cover URL via backend (MangaDex API). */
 export async function fetchMangaCoverUrl(

@@ -2,7 +2,7 @@
  * MangaDex fetch + pure helpers for the reading-list detail screen.
  */
 import type { Dispatch, SetStateAction } from "react";
-import { BACKEND_URL } from "@/app/config";
+import { BACKEND_URL } from "@/config";
 import type { Chapter, Manga } from "@/lib/mangaTypes";
 import { fetchMangaCoverUrl } from "@/lib/mangaCoverApi";
 import type { ReadingListItem } from "@/lib/readingListApi";

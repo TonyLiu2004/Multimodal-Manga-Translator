@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, Image, Text, Pressable, StyleSheet } from "react-native";
 import { Manga, Chapter } from "../types/types";
 import PopUp from "./PopUp";
-import { BACKEND_URL } from "../config";
+import { BACKEND_URL } from "@/config";
 
 interface MangaBrowserCardProps {
   manga: Manga;
