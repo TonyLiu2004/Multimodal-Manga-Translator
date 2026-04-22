@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import router as manga_router
 from fastapi.responses import JSONResponse
 from services.image_processor import ImageProcessor
+from pydantic import BaseModel
 
 ######################
 
@@ -150,10 +151,14 @@ def test(img_path: Optional[str] = None):
     else:
         print(f"{img_path} does not exist")
 
+class TranslationRequest(BaseModel):
+    image_url: str
+    language: str = ""
+
 @app.post("/api/manga/translate")
-async def translate_manga_panel(image_url: str, language: str = ""):
+async def translate_manga_panel(request: TranslationRequest):
     try:
-        results = await processor.download_and_process(image_url, language)
+        results = await processor.download_and_process(request.image_url, request.language)
         return {"status": "success", "data": results}    
     except Exception as e:
         print(f"Translation Route Error: {e}")
