@@ -87,25 +87,38 @@ async def get_manga_public_info(manga_id: str) -> dict:
     }
 
 
-async def search_manga(title: str, limit: int =20, offset: int = 0, order_by: str = "followedCount", order_direction: str = "desc", cover_art: bool = True):
-    """
-    Todo: filters by tags (include, exclude)
-    Mostly for testing at the moment
-    """
+async def search_manga(
+    title: str,
+    limit: int = 20,
+    offset: int = 0,
+    order_by: str = "followedCount",
+    order_direction: str = "desc",
+    cover_art: bool = True,
+    included_tags: list[str] | None = None,
+    excluded_tags: list[str] | None = None,
+):
+    """Search MangaDex manga with optional tag filtering."""
 
     search_url = f"{BASE_URL}/manga"
 
-    params = {
-        "limit": limit,
-        "offset": offset,
-        f"order[{order_by}]": order_direction,
-    }
+    # Build params as list of tuples to support repeated keys (e.g. includedTags[])
+    params: list[tuple[str, str]] = [
+        ("limit", str(limit)),
+        ("offset", str(offset)),
+        (f"order[{order_by}]", order_direction),
+    ]
 
     if cover_art:
-        params["includes[]"] = ["cover_art"]
+        params.append(("includes[]", "cover_art"))
 
     if title.strip():
-            params["title"] = title
+        params.append(("title", title))
+
+    for tag_id in (included_tags or []):
+        params.append(("includedTags[]", tag_id))
+
+    for tag_id in (excluded_tags or []):
+        params.append(("excludedTags[]", tag_id))
 
     async with httpx.AsyncClient() as client:
         try:

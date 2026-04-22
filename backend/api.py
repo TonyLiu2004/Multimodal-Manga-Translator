@@ -320,7 +320,9 @@ async def get_popular_manga(
     offset: int = 0,
     order_by: str = "followedCount",
     order_direction: str = "desc",
-    cover_art: bool = True
+    cover_art: bool = True,
+    includedTags: list[str] = Query(default=[]),
+    excludedTags: list[str] = Query(default=[]),
 ):
     results = await mangadex_service.search_manga(
         title=title,
@@ -328,7 +330,9 @@ async def get_popular_manga(
         offset=offset,
         order_by=order_by,
         order_direction=order_direction,
-        cover_art=cover_art
+        cover_art=cover_art,
+        included_tags=includedTags,
+        excluded_tags=excludedTags,
     )
     return results
 
