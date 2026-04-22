@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, FlatList, StyleSheet } from "react-native";
+import { View, Text, FlatList, StyleSheet, Platform } from "react-native";
 import MangaCard from "./MangaCard";
 import { Manga } from "../types/types";
 
@@ -13,7 +13,7 @@ const MangaCategoryList: React.FC<MangaCategoryListProps> = ({
   data,
 }) => {
   return (
-    <View style={{ marginTop: 30 }}>
+    <View style={{ marginTop: 30, width: "100%" }}>
       <Text style={styles.category_header}>{title}</Text>
       <FlatList
         horizontal={true}
@@ -22,8 +22,8 @@ const MangaCategoryList: React.FC<MangaCategoryListProps> = ({
         renderItem={({ item: manga }) => (
           <MangaCard
             manga={manga}
-            width={200}
-            height={300}
+            width={Platform.OS === "android" ? 150 : 200}
+            height={Platform.OS === "android" ? 230 : 300}
           />
         )}
       />
@@ -33,7 +33,7 @@ const MangaCategoryList: React.FC<MangaCategoryListProps> = ({
 
 const styles = StyleSheet.create({
   category_header: {
-    fontSize: 21,
+    fontSize: 18,
     marginBottom: 10,
   },
   category_list: {

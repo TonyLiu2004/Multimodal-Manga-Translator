@@ -4,6 +4,7 @@ import {
   Image,
   Pressable,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { Manga, Chapter } from "../types/types";
 import PopUp from "./PopUp";
@@ -91,7 +92,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 5,
+    marginHorizontal: Platform.OS === "android" ? 1 : 5,
   },
   pressable: {
     alignItems: "center",

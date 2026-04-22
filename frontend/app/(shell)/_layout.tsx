@@ -1,12 +1,18 @@
 import { Slot } from "expo-router";
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
 import SideRail from "../components/SideRail";
+import HamburgerMenu from "../components/HamburgerMenu";
+
+const BREAKPOINT = 768;
 
 export default function ShellLayout() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < BREAKPOINT;
+
   return (
-    <View style={styles.root}>
-      <SideRail />
+    <View style={isMobile ? styles.mobile : styles.wide}>
+      {isMobile ? <HamburgerMenu /> : <SideRail />}
       <View style={styles.main}>
         <Slot />
       </View>
@@ -15,9 +21,14 @@ export default function ShellLayout() {
 }
 
 const styles = StyleSheet.create({
-  root: {
+  wide: {
     flex: 1,
     flexDirection: "row",
+    backgroundColor: "#f3f4f6",
+  },
+  mobile: {
+    flex: 1,
+    flexDirection: "column",
     backgroundColor: "#f3f4f6",
   },
   main: {

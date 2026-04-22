@@ -6,10 +6,12 @@ import {
   StyleSheet,
   ActivityIndicator,
   Pressable,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { BACKEND_URL } from "../../config";
 import MangaCard from "@/app/components/MangaCard";
+import MangaBrowserCard from "@/app/components/MangaBrowserCard";
 import { Manga } from "@/app/types/types";
 import GenreMenu from "@/app/components/GenreMenu";
 
@@ -17,6 +19,8 @@ const ITEMS_PER_PAGE = 24;
 
 const BrowsePage = () => {
   const { genreId } = useLocalSearchParams();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   // Reference for scrolling to top
   const flatListRef = useRef<FlatList>(null);
@@ -30,7 +34,7 @@ const BrowsePage = () => {
   const [manga, setManga] = useState<Manga[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const numColumns = 6;
+  const numColumns = isMobile ? 1 : 6;
   const cardWidth = 200;
   const cardHeight = 300;
 
@@ -52,12 +56,16 @@ const BrowsePage = () => {
     setLoading(true);
     const offset = (page - 1) * ITEMS_PER_PAGE;
 
-    const query = new URLSearchParams({
+    const params = new URLSearchParams({
       limit: ITEMS_PER_PAGE.toString(),
       offset: offset.toString(),
-      "order[followedCount]": "desc",
-      ...(filters.genreId && { "includedTags[]": filters.genreId as string }),
-    }).toString();
+      order_by: "followedCount",
+      order_direction: "desc",
+    });
+    if (filters.genreId) {
+      params.append("includedTags", filters.genreId as string);
+    }
+    const query = params.toString();
 
     try {
       const res = await fetch(`${BACKEND_URL}/api/manga/search?${query}`, {
@@ -108,7 +116,7 @@ const BrowsePage = () => {
 
   return (
     <View style={styles.container}>
-      <GenreMenu />
+      <GenreMenu selectedGenreId={filters.genreId as string} />
 
       {loading && page === 1 ? (
         <View style={styles.centered}>
@@ -116,16 +124,20 @@ const BrowsePage = () => {
         </View>
       ) : (
         <FlatList
-          ref={flatListRef} 
+          ref={flatListRef}
           data={manga}
           key={numColumns}
           numColumns={numColumns}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.gridContainer}
-          columnWrapperStyle={styles.columnWrapper}
-          renderItem={({ item }) => (
-            <MangaCard manga={item} width={cardWidth} height={cardHeight} />
-          )}
+          contentContainerStyle={isMobile ? styles.listContainer : styles.gridContainer}
+          columnWrapperStyle={isMobile ? undefined : styles.columnWrapper}
+          renderItem={({ item }) =>
+            isMobile ? (
+              <MangaBrowserCard manga={item} />
+            ) : (
+              <MangaCard manga={item} width={cardWidth} height={cardHeight} />
+            )
+          }
           ListEmptyComponent={<Text style={styles.empty}>No manga found.</Text>}
           ListFooterComponent={renderPagination}
         />
@@ -138,6 +150,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "white" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   gridContainer: { width: "100%", paddingHorizontal: 10, paddingBottom: 20 },
+  listContainer: { width: "100%", paddingBottom: 20 },
   columnWrapper: { justifyContent: "center", gap: 20, marginBottom: 20 },
   empty: { color: "#888", textAlign: "center", marginTop: 50 },
 

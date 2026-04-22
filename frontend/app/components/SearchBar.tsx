@@ -1,5 +1,5 @@
 import React from "react";
-import { TextInput, StyleSheet } from "react-native";
+import { TextInput, StyleSheet, useWindowDimensions, Platform } from "react-native";
 
 interface SearchBarProps {
   value: string;
@@ -14,28 +14,40 @@ const SearchBar: React.FC<SearchBarProps> = ({
   onSubmitEditing,
   placeholder = "Search manga title",
 }) => {
+  const { width } = useWindowDimensions();
+
+  // Responsive width: full width on mobile (<600), 50% on larger screens
+  const searchBarWidth = width < 600 ? width - 20 : Math.min(width * 0.5, 600);
+
   return (
     <TextInput
-      style={styles.input}
+      style={[styles.input, { width: searchBarWidth }]}
       onChangeText={onChangeText}
       onSubmitEditing={onSubmitEditing}
       value={value}
       placeholder={placeholder}
+      placeholderTextColor="#999"
+      returnKeyType="search"
     />
   );
 };
 
 const styles = StyleSheet.create({
   input: {
-    height: 50,
-    width: "50%",
+    height: 48, // Android minimum touch target
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    borderRadius: 10,
-    paddingHorizontal: 15,
+    borderRadius: 12,
+    paddingHorizontal: 16,
     fontSize: 16,
     color: "#333",
     backgroundColor: "#FAFAFA",
+    marginVertical: 12,
+    ...Platform.select({
+      android: {
+        elevation: 2,
+      },
+    }),
   },
 });
 
