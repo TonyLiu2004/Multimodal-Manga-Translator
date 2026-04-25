@@ -4,6 +4,7 @@ export interface Manga {
     title: { [key: string]: string };
     description: { en?: string };
     availableTranslatedLanguages: string[];
+    tags ?: { attributes: { group: string; name: { en: string } } }[];
   };
   relationships: {
     type: string;
