@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Switch,
@@ -47,7 +48,6 @@ export default function MangaReader({
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const listRef = useRef<FlatList<string>>(null);
 
-  const [showMenu, setShowMenu] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [autoTranslateEnabled, setAutoTranslateEnabled] = useState(true);
   const [translationsByPage, setTranslationsByPage] = useState<
@@ -65,8 +65,15 @@ export default function MangaReader({
   const bottomInset = Math.max(insets.bottom, 8);
   const topInset = Math.max(insets.top, 8);
   const pageChromeBottom = bottomInset + 16;
+  /** Browser vertical scrollbar overlaps the viewport on web; reserve space so chrome doesn't sit under it. */
+  const webScrollbarGutter = Platform.OS === "web" ? 22 : 0;
+  const translateToolbarRight =
+    12 + Math.max(insets.right, 0) + webScrollbarGutter;
 
-  const getItemLayout = (_data: ArrayLike<string> | null | undefined, index: number) => ({
+  const getItemLayout = (
+    _data: ArrayLike<string> | null | undefined,
+    index: number,
+  ) => ({
     length: screenHeight,
     offset: screenHeight * index,
     index,
@@ -77,7 +84,10 @@ export default function MangaReader({
 
   const renderPage = ({ item, index }: { item: string; index: number }) => (
     <View
-      style={[styles.pageContainer, { width: screenWidth, height: screenHeight }]}
+      style={[
+        styles.pageContainer,
+        { width: screenWidth, height: screenHeight },
+      ]}
     >
       <Image source={{ uri: item }} style={styles.page} resizeMode="contain" />
       <Text style={[styles.pageNumber, { bottom: pageChromeBottom }]}>
@@ -198,9 +208,6 @@ export default function MangaReader({
     if (nextPage !== currentPage) {
       setCurrentPage(nextPage);
     }
-    if (showMenu) {
-      setShowMenu(false);
-    }
   };
 
   const showChapterFooter =
@@ -275,45 +282,62 @@ export default function MangaReader({
         <Text style={styles.topReturnLabel}>Return</Text>
       </Pressable>
 
-      {showMenu && (
-        <View style={styles.menuContainer}>
-          <TouchableOpacity style={styles.menuButton} onPress={() => handleTranslate()}>
-            <Text style={styles.menuButtonText}>Translate</Text>
-          </TouchableOpacity>
-          <View style={styles.autoTranslateToggleRow}>
-            <Text style={styles.autoTranslateToggleText}>Auto translate</Text>
-            <Switch
-              value={autoTranslateEnabled}
-              onValueChange={setAutoTranslateEnabled}
-              thumbColor="#fff"
-              trackColor={{
-                false: "rgba(255,255,255,0.25)",
-                true: "rgba(34,197,94,0.7)",
-              }}
-            />
-          </View>
-          {inFlightByPage[currentPage] && (
-            <View style={styles.inFlightIndicator}>
-              <ActivityIndicator size="small" color="#fff" />
-              <Text style={styles.inFlightText}>Translating current page...</Text>
-            </View>
-          )}
-
-          {translationsByPage[currentPage] && (
-            <View style={styles.translationPanel}>
-              <Text style={styles.translationTitle}>Page {currentPage} translations</Text>
-              {translationsByPage[currentPage].map((bubble) => (
-                <View key={bubble.bubble_index} style={styles.translationItem}>
-                  <Text style={styles.translationText}>{bubble.original_text}</Text>
-                  <Text style={styles.translationText}>{bubble.translated_text}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+      <View
+        style={[
+          styles.translateToolbar,
+          {
+            top: topInset + 4,
+            right: translateToolbarRight,
+            maxWidth: Math.min(screenWidth * 0.52, 268),
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => handleTranslate()}
+        >
+          <Text style={styles.menuButtonText}>Translate</Text>
+        </TouchableOpacity>
+        <View style={styles.autoTranslateToggleRow}>
+          <Text style={styles.autoTranslateToggleText}>Auto translate</Text>
+          <Switch
+            value={autoTranslateEnabled}
+            onValueChange={setAutoTranslateEnabled}
+            thumbColor="#fff"
+            trackColor={{
+              false: "rgba(255,255,255,0.25)",
+              true: "rgba(34,197,94,0.7)",
+            }}
+          />
         </View>
-      )}
+        {inFlightByPage[currentPage] && (
+          <View style={styles.inFlightIndicator}>
+            <ActivityIndicator size="small" color="#fff" />
+            <Text style={styles.inFlightText}>Translating current page...</Text>
+          </View>
+        )}
 
-      <Pressable style={{ flex: 1 }} onPress={() => setShowMenu(true)}>
+        {translationsByPage[currentPage] && (
+          <View style={styles.translationPanel}>
+            <Text style={styles.translationTitle}>
+              Page {currentPage} translations
+            </Text>
+            {translationsByPage[currentPage].map((bubble) => (
+              <View key={bubble.bubble_index} style={styles.translationItem}>
+                <Text style={styles.translationText}>
+                  {bubble.original_text}
+                </Text>
+                <Text style={styles.translationText}>
+                  {bubble.translated_text}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View style={{ flex: 1 }}>
         <FlatList
           ref={listRef}
           data={pages}
@@ -336,7 +360,7 @@ export default function MangaReader({
           scrollEventThrottle={SCROLL_EVENT_THROTTLE}
           ListFooterComponent={chapterFooter}
         />
-      </Pressable>
+      </View>
     </View>
   );
 }
@@ -364,15 +388,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     zIndex: 10,
   },
-  menuContainer: {
+  translateToolbar: {
     position: "absolute",
-    top: 16,
-    alignSelf: "center",
-    zIndex: 20,
-    alignItems: "center",
-    width: "92%",
+    zIndex: 38,
+    alignItems: "stretch",
+    alignSelf: "flex-end",
   },
   menuButton: {
+    alignSelf: "flex-end",
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -388,6 +411,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
     width: "100%",
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     borderRadius: 10,
@@ -404,6 +428,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    alignSelf: "stretch",
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     borderRadius: 10,
     paddingHorizontal: 12,
@@ -416,7 +441,7 @@ const styles = StyleSheet.create({
   },
   translationPanel: {
     marginTop: 10,
-    width: "100%",
+    alignSelf: "stretch",
     maxHeight: 250,
     backgroundColor: "rgba(0, 0, 0, 0.75)",
     borderRadius: 10,

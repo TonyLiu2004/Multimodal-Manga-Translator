@@ -23,6 +23,10 @@ jobs:
 
       - name: Install & Build
         working-directory: frontend
+        env:
+          # Optional: GitHub repo secret EXPO_PUBLIC_BACKEND_URL overrides API host for the static bundle.
+          # If unset, frontend/config.ts uses the default Hugging Face backend URL for production builds.
+          EXPO_PUBLIC_BACKEND_URL: ${{ secrets.EXPO_PUBLIC_BACKEND_URL }}
         run: |
           npm ci
           npm run build

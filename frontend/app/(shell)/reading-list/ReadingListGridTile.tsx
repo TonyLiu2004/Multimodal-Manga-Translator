@@ -163,39 +163,40 @@ export default function ReadingListGridTile({
       ) : null}
 
       <View style={styles.lastReadRow}>
-        <Text style={styles.lastReadLabel}>Last read:</Text>
+        <View style={styles.lastReadLeft}>
+          <Text style={styles.lastReadLabel}>Last read:</Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.chapterHit,
+              (!canOpen || readerBusy) && styles.chapterDisabled,
+              pressed && canOpen && !readerBusy && styles.chapterPressed,
+            ]}
+            onPress={onChapterPress}
+            disabled={!canOpen || readerBusy}
+            hitSlop={{ top: 4, bottom: 4 }}
+          >
+            {openingThisTile ? (
+              <ActivityIndicator size="small" color="#2563eb" />
+            ) : (
+              <Text style={styles.chapterText}>{chapterLabel}</Text>
+            )}
+          </Pressable>
+        </View>
         <Pressable
-          style={({ pressed }) => [
-            styles.chapterHit,
-            (!canOpen || readerBusy) && styles.chapterDisabled,
-            pressed && canOpen && !readerBusy && styles.chapterPressed,
-          ]}
-          onPress={onChapterPress}
-          disabled={!canOpen || readerBusy}
-          hitSlop={{ top: 4, bottom: 4 }}
+          style={({ pressed }) => [styles.trash, pressed && styles.trashPressed]}
+          onPress={onRemove}
+          disabled={removing}
+          accessibilityRole="button"
+          accessibilityLabel="Remove from list"
+          hitSlop={10}
         >
-          {openingThisTile ? (
-            <ActivityIndicator size="small" color="#2563eb" />
+          {removing ? (
+            <ActivityIndicator size="small" color="#b91c1c" />
           ) : (
-            <Text style={styles.chapterText}>{chapterLabel}</Text>
+            <Ionicons name="trash-outline" size={18} color="#b91c1c" />
           )}
         </Pressable>
       </View>
-
-      <Pressable
-        style={({ pressed }) => [styles.trash, pressed && styles.trashPressed]}
-        onPress={onRemove}
-        disabled={removing}
-        accessibilityRole="button"
-        accessibilityLabel="Remove from list"
-        hitSlop={10}
-      >
-        {removing ? (
-          <ActivityIndicator size="small" color="#b91c1c" />
-        ) : (
-          <Ionicons name="trash-outline" size={18} color="#b91c1c" />
-        )}
-      </Pressable>
     </View>
   );
 }
@@ -206,7 +207,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     padding: 6,
-    paddingBottom: 36,
     borderWidth: 1,
     borderColor: "#e5e7eb",
     ...cardShadow,
@@ -269,9 +269,19 @@ const styles = StyleSheet.create({
   lastReadRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
+    justifyContent: "space-between",
     marginTop: 8,
+    gap: 8,
+    minHeight: 32,
+  },
+  lastReadLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
     gap: 6,
+    minWidth: 0,
+    marginRight: 4,
   },
   lastReadLabel: {
     fontSize: 12,
@@ -290,11 +300,9 @@ const styles = StyleSheet.create({
     color: "#2563eb",
   },
   trash: {
-    position: "absolute",
-    bottom: 6,
-    right: 6,
     padding: 6,
     borderRadius: 10,
+    flexShrink: 0,
   },
   trashPressed: {
     opacity: 0.7,
