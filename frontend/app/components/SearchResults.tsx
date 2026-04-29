@@ -1,11 +1,6 @@
 import React from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  useWindowDimensions,
-  StyleSheet,
-} from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
+import { useClientSafeDimensions } from "@/lib/useClientSafeDimensions";
 import MangaCard from "./MangaCard";
 import { Manga } from "@/lib/mangaTypes";
 
@@ -16,7 +11,7 @@ interface SearchResultsProps {
 const SearchResults: React.FC<SearchResultsProps> = ({
   mangaList,
 }) => {
-  const { width } = useWindowDimensions();
+  const { width } = useClientSafeDimensions();
   const isDesktop = width > 600;
 
   if (mangaList.length === 0) return null;

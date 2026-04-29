@@ -9,13 +9,13 @@ import {
   Switch,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BACKEND_URL } from "@/config";
+import { useClientSafeDimensions } from "@/lib/useClientSafeDimensions";
 
 export type ChapterNavEntry = {
   id: string;
@@ -45,7 +45,8 @@ export default function MangaReader({
 }: MangaReaderProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } =
+    useClientSafeDimensions();
   const listRef = useRef<FlatList<string>>(null);
 
   const [currentPage, setCurrentPage] = useState(1);

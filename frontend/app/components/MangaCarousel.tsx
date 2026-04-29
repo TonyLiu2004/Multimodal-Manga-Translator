@@ -1,5 +1,6 @@
 import React from "react";
-import { View, useWindowDimensions, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
+import { useClientSafeDimensions } from "@/lib/useClientSafeDimensions";
 import Carousel, { ICarouselInstance } from "react-native-reanimated-carousel";
 import MangaCard from "./MangaCard";
 import { Manga } from "@/lib/mangaTypes";
@@ -9,7 +10,7 @@ interface MangaCarouselProps {
 }
 
 const MangaCarousel: React.FC<MangaCarouselProps> = ({ data}) => {
-  const { width } = useWindowDimensions();
+  const { width } = useClientSafeDimensions();
   const ref = React.useRef<ICarouselInstance>(null);
 
   // Responsive card dimensions

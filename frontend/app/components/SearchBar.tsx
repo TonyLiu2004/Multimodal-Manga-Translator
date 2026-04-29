@@ -1,5 +1,6 @@
 import React from "react";
-import { TextInput, StyleSheet, useWindowDimensions, Platform } from "react-native";
+import { TextInput, StyleSheet, Platform } from "react-native";
+import { useClientSafeDimensions } from "@/lib/useClientSafeDimensions";
 
 interface SearchBarProps {
   value: string;
@@ -14,7 +15,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   onSubmitEditing,
   placeholder = "Search manga title",
 }) => {
-  const { width } = useWindowDimensions();
+  const { width } = useClientSafeDimensions();
 
   // Responsive width: full width on mobile (<600), 50% on larger screens
   const searchBarWidth = width < 600 ? width - 20 : Math.min(width * 0.5, 600);

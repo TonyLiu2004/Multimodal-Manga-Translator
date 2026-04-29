@@ -5,6 +5,8 @@
 
 # Expo
 .expo/
+# Copied from node_modules by scripts/ensure-ionicons-font.js
+assets/fonts/Ionicons.ttf
 dist/
 web-build/
 expo-env.d.ts

@@ -1,13 +1,14 @@
 import { Slot } from "expo-router";
 import React from "react";
-import { StyleSheet, View, useWindowDimensions } from "react-native";
+import { StyleSheet, View } from "react-native";
 import SideRail from "../components/SideRail";
 import HamburgerMenu from "../components/HamburgerMenu";
+import { useClientSafeDimensions } from "@/lib/useClientSafeDimensions";
 
 const BREAKPOINT = 768;
 
 export default function ShellLayout() {
-  const { width } = useWindowDimensions();
+  const { width } = useClientSafeDimensions();
   const isMobile = width < BREAKPOINT;
 
   return (

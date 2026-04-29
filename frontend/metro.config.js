@@ -11,6 +11,8 @@ const targetFile = path.join(
   'resolveAssetSource.js'
 );
 
+const ioniconsFont = path.join(__dirname, 'assets', 'fonts', 'Ionicons.ttf');
+
 const defaultResolveRequest = config.resolver.resolveRequest;
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
@@ -18,6 +20,15 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     return {
       type: 'sourceFile',
       filePath: targetFile,
+    };
+  }
+
+  const normalized =
+    typeof moduleName === 'string' ? moduleName.replace(/\\/g, '/') : '';
+  if (normalized.endsWith('Fonts/Ionicons.ttf')) {
+    return {
+      type: 'sourceFile',
+      filePath: ioniconsFont,
     };
   }
 

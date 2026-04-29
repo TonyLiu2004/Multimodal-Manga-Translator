@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   Pressable,
-  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { BACKEND_URL } from "@/config";
@@ -15,12 +14,13 @@ import MangaBrowseCard from "@/app/components/MangaBrowseCard";
 import { Manga } from "@/lib/mangaTypes";
 import GenreMenu from "@/app/components/GenreMenu";
 import { SORT_MAP } from "@/app/components/filter_tags";
+import { useClientSafeDimensions } from "@/lib/useClientSafeDimensions";
 
 const ITEMS_PER_PAGE = 24;
 
 const BrowsePage = () => {
   const { genreId } = useLocalSearchParams();
-  const { width } = useWindowDimensions();
+  const { width } = useClientSafeDimensions();
   const isMobile = width < 768;
 
   // Reference for scrolling to top
