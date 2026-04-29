@@ -34,8 +34,8 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 | Method | Path                 | Description                                                                                        |
 | ------ | -------------------- | -------------------------------------------------------------------------------------------------- |
 | GET    | `/entries`           | List all chapters. Query: `order_by`, `order_desc`                                                 |
-| GET    | `/segments`          | Get segments. Query: `provider_id`, `manga_title`, `chapter_number`, `page_number` (all optional)  |
-| GET    | `/chapters/segments` | Get all segments for one chapter. Query: `provider_id`, `manga_title`, `chapter_number` (required) |
+| GET    | `/panels`          | Get panels. Query: `manga_title`, `chapter_number`, `page_number` (all optional)  |
+| GET    | `/chapters/panels` | Get all panels for one chapter. Query: `manga_title`, `chapter_number` (required) |
 | GET    | `/health`            | Health check                                                                                       |
 
 ## Example requests (frontend or curl)
@@ -48,10 +48,10 @@ curl "http://localhost:8000/entries"
 curl "http://localhost:8000/entries?order_by=manga_title&order_desc=false"
 
 # Get all segments for a chapter
-curl "http://localhost:8000/chapters/segments?provider_id=local&manga_title=One%20Piece&chapter_number=1"
+curl "http://localhost:8000/chapters/panels?manga_title=One%20Piece&chapter_number=1"
 
 # Get segments for one page
-curl "http://localhost:8000/segments?provider_id=local&manga_title=One%20Piece&chapter_number=1&page_number=1"
+curl "http://localhost:8000/panels?manga_title=One%20Piece&chapter_number=1&page_number=1"
 ```
 
 ## CORS

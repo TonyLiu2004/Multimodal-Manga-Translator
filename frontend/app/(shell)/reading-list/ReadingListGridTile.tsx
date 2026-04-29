@@ -30,11 +30,11 @@ export type ReadingListGridTileProps = {
   extId: string | null;
   canOpen: boolean;
   openingThisTile: boolean;
-  /** True while any tile is opening the reader (blocks other taps). */
   readerBusy: boolean;
   removing: boolean;
   onCoverPress: () => void;
   onChapterPress: () => void;
+  onTitlePress: () => void;
   onReadMore: () => void;
   onRemove: () => void;
 };
@@ -64,6 +64,7 @@ export default function ReadingListGridTile({
   removing,
   onCoverPress,
   onChapterPress,
+  onTitlePress,
   onReadMore,
   onRemove,
 }: ReadingListGridTileProps) {
@@ -90,7 +91,7 @@ export default function ReadingListGridTile({
           !canOpen && styles.coverDisabled,
         ]}
         onPress={onCoverPress}
-        disabled={readerBusy}
+        disabled={readerBusy || !canOpen}
       >
         <View style={[styles.coverWrap, { width: coverWidth, height: coverHeight }]}>
           <Image
@@ -106,9 +107,34 @@ export default function ReadingListGridTile({
         </View>
       </Pressable>
 
-      <Text style={styles.title} numberOfLines={2}>
-        {displayTitle}
-      </Text>
+      {extId ? (
+        <Pressable
+          style={({ pressed }) => [
+            styles.titlePressable,
+            pressed && styles.titlePressed,
+          ]}
+          onPress={onTitlePress}
+          hitSlop={{ top: 4, bottom: 4 }}
+          accessibilityRole="button"
+          accessibilityLabel="Open manga details"
+        >
+          <Text
+            style={styles.title}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {displayTitle}
+          </Text>
+        </Pressable>
+      ) : (
+        <Text
+          style={styles.title}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {displayTitle}
+        </Text>
+      )}
 
       {descLoading ? (
         <View style={styles.descSpinnerWrap}>
@@ -203,11 +229,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(17,24,39,0.35)",
   },
+  titlePressable: {
+    alignSelf: "stretch",
+    borderRadius: 6,
+  },
+  titlePressed: { opacity: 0.75 },
   title: {
+    alignSelf: "stretch",
+    maxWidth: "100%",
+    flexShrink: 1,
+    marginTop: 6,
     fontSize: 14,
     fontWeight: "700",
     color: "#111827",
-    marginTop: 6,
     lineHeight: 18,
   },
   description: {

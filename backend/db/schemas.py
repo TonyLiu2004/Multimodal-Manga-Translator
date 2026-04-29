@@ -17,12 +17,12 @@ class MangaOut(SQLModel):
 
 
 class ChapterListOut(SQLModel):
-    """Chapter list response (includes manga_title, provider_id from chapter)."""
+    """Chapter list response (includes manga_title)."""
 
     manga_title: str
-    provider_id: str
     id: int
     chapter_number: float
+    mangadex_chapter_id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -66,28 +66,36 @@ class ReadingListItemOut(SQLModel):
 
 
 class ReadingListAddIn(SQLModel):
-    """Add a title by provider catalog id (e.g. MangaDex UUID)."""
+    """Add a title by MangaDex series id (UUID)."""
 
-    provider_id: str = Field(default="mangadex")
     external_manga_id: str
     manga_title: str
     last_chapter_number: Optional[float] = None
 
 
-class SegmentListOut(SQLModel):
-    """Segment list response (join of Segments + Pages + Chapters + Manga)."""
+class ReadingListProgressPatchIn(SQLModel):
+    """Update furthest chapter read for a title already on a list."""
+
+    last_chapter_number: float
+
+
+class PanelListOut(SQLModel):
+    """Panel list response (join of Panels + Chapters + Manga)."""
 
     id: int
-    provider_id: str
     manga_title: str
     chapter_number: float
-    page_number: int
-    segment_index: int
+    page_number: Optional[int] = None
+    mangadex_chapter_id: Optional[str] = None
+    bubble_index: int
+    width: Optional[int] = None
+    height: Optional[int] = None
     x1: float
     y1: float
     x2: float
     y2: float
     original_text: str
     translated_text: str
+    panel_url: Optional[str] = None
     language_code: str
     created_at: Optional[datetime] = None

@@ -7,7 +7,6 @@ User table: app profile keyed by Supabase auth user id (UUID)
 
 Manga table: stores manga metadata
   id: int, primary key
-  provider_id: str
   manga_title: str
   created_at: datetime
 
@@ -17,9 +16,7 @@ Chapter table: stores manga chapter info
   page_number: int
   created_at: datetime
 
-Chapter table: chapter data scoped by provider (same umbrella manga can have chapters per source)
-
-Page / Segment tables: unchanged hierarchy under chapters
+Chapter table: chapter data (single-provider setup)
 
 ReadingListCollection: named list per user (e.g. "Want to read").
 ReadingListItem: one row per named list + umbrella manga (manga_id).
@@ -47,31 +44,19 @@ class Users(SQLModel, table=True):
 
 
 class Manga(SQLModel, table=True):
-    """Umbrella series; use MangaSource for per-provider external ids."""
+    """Umbrella series.
+
+    We keep MangaDex series id directly on this table (optional) since MangaDex
+    is the primary external provider used by the app.
+    """
 
     __table_args__ = ({"extend_existing": True},)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     manga_title: str = Field(index=True)
+    mangadex_manga_id: Optional[str] = Field(default=None, index=True, unique=True)
     created_at: Optional[datetime] = Field(default_factory=_utc_now)
     updated_at: Optional[datetime] = Field(default_factory=_utc_now)
-
-
-class MangaSource(SQLModel, table=True):
-    """Links an umbrella manga to a provider catalog id (e.g. MangaDex UUID)."""
-
-    __tablename__ = "manga_source"
-    __table_args__ = (
-        UniqueConstraint("provider_id", "external_manga_id", name="uq_manga_source_provider_external"),
-        UniqueConstraint("manga_id", "provider_id", name="uq_manga_source_manga_provider"),
-        {"extend_existing": True},
-    )
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    manga_id: int = Field(foreign_key="manga.id", index=True)
-    provider_id: str = Field(index=True)
-    external_manga_id: str = Field(index=True) #if there is no external manga id, it will be the same as the manga_id with local in front
-    created_at: Optional[datetime] = Field(default_factory=_utc_now)
 
 
 class ReadingListCollection(SQLModel, table=True):
@@ -106,41 +91,39 @@ class ReadingListItem(SQLModel, table=True):
 
 class Chapters(SQLModel, table=True):
     __table_args__ = (
-        UniqueConstraint("manga_id", "provider_id", "chapter_number", name="uq_chapters_manga_provider_chapter"),
+        UniqueConstraint("manga_id", "chapter_number", name="uq_chapters_manga_chapter"),
         {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     manga_id: int = Field(foreign_key="manga.id", index=True)
-    provider_id: str = Field(index=True)
     chapter_number: float = Field(index=True)
+    # MangaDex chapter UUID (single-provider setup)
+    mangadex_chapter_id: Optional[str] = Field(default=None, index=True)
     language_code: str
     created_at: Optional[datetime] = Field(default_factory=_utc_now)
     updated_at: Optional[datetime] = Field(default_factory=_utc_now)
 
 
-class Pages(SQLModel, table=True):
+class Panels(SQLModel, table=True):
+    __tablename__ = "panels"
     __table_args__ = (
-        UniqueConstraint("chapter_id", "page_number", name="uq_pages_chapter_page"),
+        Index("ix_panels_chapter_page_bubble", "chapter_id", "page_number", "bubble_index"),
         {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     chapter_id: int = Field(foreign_key="chapters.id", index=True)
-    page_number: int = Field(index=True)
-    created_at: Optional[datetime] = Field(default_factory=_utc_now)
-    updated_at: Optional[datetime] = Field(default_factory=_utc_now)
-
-
-class Segments(SQLModel, table=True):
-    __table_args__ = (
-        Index("ix_segments_page_segment", "page_id", "segment_index"),
-        {"extend_existing": True},
-    )
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    page_id: int = Field(foreign_key="pages.id", index=True)
-    segment_index: int
+    page_number: Optional[int] = Field(default=None, index=True)
+    # Denormalized copy of MangaDex chapter UUID for convenience (optional).
+    mangadex_chapter_id: Optional[str] = Field(default=None, index=True)
+    # Optional URL for this panel's image (e.g. MangaDex at-home URL or proxied URL).
+    panel_url: Optional[str] = Field(default=None)
+    # bubble index within a page (0..N-1)
+    bubble_index: int
+    # page dimensions for this segment's coordinate space (optional; helpful for clients)
+    width: Optional[int] = Field(default=None)
+    height: Optional[int] = Field(default=None)
     x1: float
     y1: float
     x2: float

@@ -32,84 +32,77 @@ class TestDb(unittest.TestCase):
 
     def setUp(self):
         """Clean up test data before each test."""
-        db.delete_chapter_segments(db.PROVIDER_LOCAL, self.MANGA, self.CHAPTER)
+        db.delete_chapter_panels(self.MANGA, self.CHAPTER)
 
     def tearDown(self):
-        db.delete_chapter_segments(db.PROVIDER_LOCAL, self.MANGA, self.CHAPTER)
+        db.delete_chapter_panels(self.MANGA, self.CHAPTER)
 
     def test_init_db(self):
         """init_db creates tables without error."""
         db.init_db()
 
-    def test_save_and_get_segments(self):
-        """save_page_translation stores segments; get_segments returns them."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+    def test_save_and_get_panels(self):
+        """save_panels_translation stores panels; get_panels returns them."""
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("こんにちは", "Hello"),
+            panels=_bubbles("こんにちは", "Hello"),
             language_code=self.LANG,
         )
-        rows = db.get_segments(provider_id=db.PROVIDER_LOCAL, manga_title=self.MANGA, chapter_number=self.CHAPTER, page_number=self.PAGE)
+        rows = db.get_panels(manga_title=self.MANGA, chapter_number=self.CHAPTER, page_number=self.PAGE)
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0].translated_text, "Hello")
-        self.assertEqual(rows[0].provider_id, db.PROVIDER_LOCAL)
         self.assertEqual(rows[0].manga_title, self.MANGA)
         self.assertEqual(rows[0].chapter_number, self.CHAPTER)
         self.assertEqual(rows[0].page_number, self.PAGE)
 
     def test_save_replaces_existing(self):
-        """save_page_translation replaces existing segments for same page."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+        """save_panels_translation replaces existing panels for same page."""
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("first", "First"),
+            panels=_bubbles("first", "First"),
             language_code=self.LANG,
         )
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("second", "Second"),
+            panels=_bubbles("second", "Second"),
             language_code=self.LANG,
         )
-        rows = db.get_segments(provider_id=db.PROVIDER_LOCAL, manga_title=self.MANGA, chapter_number=self.CHAPTER, page_number=self.PAGE)
+        rows = db.get_panels(manga_title=self.MANGA, chapter_number=self.CHAPTER, page_number=self.PAGE)
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0].translated_text, "Second")
 
-    def test_get_chapter_segments(self):
-        """get_chapter_segments returns all segments for a chapter."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+    def test_get_chapter_panels(self):
+        """get_chapter_panels returns all panels for a chapter."""
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=1,
-            bubbles=_bubbles("a", "A"),
+            panels=_bubbles("a", "A"),
             language_code=self.LANG,
         )
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=2,
-            bubbles=_bubbles("b", "B"),
+            panels=_bubbles("b", "B"),
             language_code=self.LANG,
         )
-        rows = db.get_chapter_segments(db.PROVIDER_LOCAL, self.MANGA, self.CHAPTER)
+        rows = db.get_chapter_panels(self.MANGA, self.CHAPTER)
         self.assertEqual(len(rows), 4)  # 2 bubbles per page, 2 pages
 
     def test_list_mangas(self):
         """list_mangas returns mangas; order_by and order_desc work."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("x", "X"),
+            panels=_bubbles("x", "X"),
             language_code=self.LANG,
         )
         entries = db.list_mangas()
@@ -125,12 +118,11 @@ class TestDb(unittest.TestCase):
 
     def test_list_mangas_pagination(self):
         """list_mangas respects limit and offset."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("x", "X"),
+            panels=_bubbles("x", "X"),
             language_code=self.LANG,
         )
         all_entries = db.list_mangas()
@@ -140,138 +132,117 @@ class TestDb(unittest.TestCase):
         self.assertEqual(len(offset_entries), 1)
 
     def test_list_chapters(self):
-        """list_chapters returns chapters for a manga; optional provider_id filter."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+        """list_chapters returns chapters for a manga."""
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("x", "X"),
+            panels=_bubbles("x", "X"),
             language_code=self.LANG,
         )
         chapters = db.list_chapters(self.MANGA)
         found = [c for c in chapters if c.chapter_number == self.CHAPTER]
         self.assertGreater(len(found), 0)
         self.assertTrue(hasattr(found[0], "manga_title"))
-        self.assertTrue(hasattr(found[0], "provider_id"))
+        # single-provider setup: no provider_id stored on chapters
         self.assertTrue(hasattr(found[0], "id"))
         self.assertTrue(hasattr(found[0], "chapter_number"))
         self.assertTrue(hasattr(found[0], "created_at"))
         self.assertTrue(hasattr(found[0], "updated_at"))
         self.assertEqual(found[0].manga_title, self.MANGA)
-        self.assertEqual(found[0].provider_id, db.PROVIDER_LOCAL)
+        # provider removed
 
-        chapters_with_provider = db.list_chapters(self.MANGA, provider_id=db.PROVIDER_LOCAL)
-        self.assertGreater(len(chapters_with_provider), 0)
+        self.assertGreater(len(chapters), 0)
 
     def test_list_chapters_pagination(self):
         """list_chapters respects limit and offset."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("x", "X"),
+            panels=_bubbles("x", "X"),
             language_code=self.LANG,
         )
-        all_chapters = db.list_chapters(self.MANGA, provider_id=db.PROVIDER_LOCAL)
-        limited = db.list_chapters(self.MANGA, provider_id=db.PROVIDER_LOCAL, limit=1)
+        all_chapters = db.list_chapters(self.MANGA)
+        limited = db.list_chapters(self.MANGA, limit=1)
         self.assertEqual(len(limited), 1)
-        offset_chapters = db.list_chapters(self.MANGA, provider_id=db.PROVIDER_LOCAL, limit=1, offset=0)
+        offset_chapters = db.list_chapters(self.MANGA, limit=1, offset=0)
         self.assertEqual(len(offset_chapters), 1)
 
-    def test_get_segments_pagination(self):
-        """get_segments respects limit and offset."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+    def test_get_panels_pagination(self):
+        """get_panels respects limit and offset."""
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("a", "A"),
+            panels=_bubbles("a", "A"),
             language_code=self.LANG,
         )
-        all_rows = db.get_segments(provider_id=db.PROVIDER_LOCAL, manga_title=self.MANGA, chapter_number=self.CHAPTER)
+        all_rows = db.get_panels(manga_title=self.MANGA, chapter_number=self.CHAPTER)
         self.assertEqual(len(all_rows), 2)
-        limited = db.get_segments(provider_id=db.PROVIDER_LOCAL, manga_title=self.MANGA, chapter_number=self.CHAPTER, limit=1)
+        limited = db.get_panels(manga_title=self.MANGA, chapter_number=self.CHAPTER, limit=1)
         self.assertEqual(len(limited), 1)
-        offset_rows = db.get_segments(provider_id=db.PROVIDER_LOCAL, manga_title=self.MANGA, chapter_number=self.CHAPTER, limit=1, offset=1)
+        offset_rows = db.get_panels(manga_title=self.MANGA, chapter_number=self.CHAPTER, limit=1, offset=1)
         self.assertEqual(len(offset_rows), 1)
         self.assertEqual(offset_rows[0].translated_text, "A 2")
 
-    def test_delete_page_segments(self):
-        """delete_page_segments removes page and its segments."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+    def test_delete_page_panels(self):
+        """delete_page_panels removes panels for one page."""
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("x", "X"),
+            panels=_bubbles("x", "X"),
             language_code=self.LANG,
         )
-        db.delete_page_segments(db.PROVIDER_LOCAL, self.MANGA, self.CHAPTER, self.PAGE)
-        rows = db.get_segments(provider_id=db.PROVIDER_LOCAL, manga_title=self.MANGA, chapter_number=self.CHAPTER, page_number=self.PAGE)
+        db.delete_page_panels(self.MANGA, self.CHAPTER, self.PAGE)
+        rows = db.get_panels(manga_title=self.MANGA, chapter_number=self.CHAPTER, page_number=self.PAGE)
         self.assertEqual(len(rows), 0)
 
-    def test_delete_chapter_segments(self):
-        """delete_chapter_segments removes chapter and all its pages/segments."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_LOCAL,
+    def test_delete_chapter_panels(self):
+        """delete_chapter_panels removes chapter and all its panels."""
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("x", "X"),
+            panels=_bubbles("x", "X"),
             language_code=self.LANG,
         )
-        db.delete_chapter_segments(db.PROVIDER_LOCAL, self.MANGA, self.CHAPTER)
-        rows = db.get_chapter_segments(db.PROVIDER_LOCAL, self.MANGA, self.CHAPTER)
+        db.delete_chapter_panels(self.MANGA, self.CHAPTER)
+        rows = db.get_chapter_panels(self.MANGA, self.CHAPTER)
         self.assertEqual(len(rows), 0)
 
-    def test_provider_id_validation_save(self):
-        """save_page_translation raises ValueError for invalid provider_id."""
-        with self.assertRaises(ValueError) as ctx:
-            db.save_page_translation(
-                provider_id="invalid_provider",
-                manga_title=self.MANGA,
-                chapter_number=self.CHAPTER,
-                page_number=self.PAGE,
-                bubbles=_bubbles("x", "X"),
-                language_code=self.LANG,
-            )
-        self.assertIn("provider_id must be one of", str(ctx.exception))
-
-    def test_provider_id_validation_get_chapter_segments(self):
-        """get_chapter_segments raises ValueError for invalid provider_id."""
-        with self.assertRaises(ValueError):
-            db.get_chapter_segments("invalid_provider", self.MANGA, self.CHAPTER)
+    def test_save_requires_no_provider_id(self):
+        """save_panels_translation does not require a provider_id."""
+        db.save_panels_translation(
+            manga_title=self.MANGA,
+            chapter_number=self.CHAPTER,
+            page_number=self.PAGE,
+            panels=_bubbles("x", "X"),
+            language_code=self.LANG,
+        )
 
     def test_provider_id_validation_delete_page(self):
-        """delete_page_segments raises ValueError for invalid provider_id."""
-        with self.assertRaises(ValueError):
-            db.delete_page_segments("invalid_provider", self.MANGA, self.CHAPTER, self.PAGE)
+        """delete_page_panels deletes without a provider_id."""
+        # No exception expected; function no longer takes a provider.
+        db.delete_page_panels(self.MANGA, self.CHAPTER, self.PAGE)
 
     def test_provider_id_validation_delete_chapter(self):
-        """delete_chapter_segments raises ValueError for invalid provider_id."""
-        with self.assertRaises(ValueError):
-            db.delete_chapter_segments("invalid_provider", self.MANGA, self.CHAPTER)
-
-    def test_provider_id_validation_get_segments(self):
-        """get_segments raises ValueError when provider_id is invalid."""
-        with self.assertRaises(ValueError):
-            db.get_segments(provider_id="invalid_provider")
+        """delete_chapter_panels deletes without a provider_id."""
+        db.delete_chapter_panels(self.MANGA, self.CHAPTER)
 
     def test_provider_mangadex(self):
-        """PROVIDER_MANGADEX is accepted."""
-        db.save_page_translation(
-            provider_id=db.PROVIDER_MANGADEX,
+        """Basic provider-less flow works."""
+        db.save_panels_translation(
             manga_title=self.MANGA,
             chapter_number=self.CHAPTER,
             page_number=self.PAGE,
-            bubbles=_bubbles("m", "M"),
+            panels=_bubbles("m", "M"),
             language_code=self.LANG,
         )
-        rows = db.get_segments(provider_id=db.PROVIDER_MANGADEX, manga_title=self.MANGA, chapter_number=self.CHAPTER)
+        rows = db.get_panels(manga_title=self.MANGA, chapter_number=self.CHAPTER)
         self.assertEqual(len(rows), 2)
-        db.delete_chapter_segments(db.PROVIDER_MANGADEX, self.MANGA, self.CHAPTER)
+        db.delete_chapter_panels(self.MANGA, self.CHAPTER)
 
 
 class TestDbNoUrl(unittest.TestCase):

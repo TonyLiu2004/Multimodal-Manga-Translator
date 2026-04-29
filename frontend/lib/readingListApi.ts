@@ -125,6 +125,28 @@ export async function removeReadingListItem(
   if (!res.ok) throw new Error(await readError(res));
 }
 
+/** Updates furthest chapter read (backend keeps the maximum stored value). */
+export async function patchReadingListItemProgress(
+  accessToken: string,
+  readingListId: number,
+  mangaId: number,
+  lastChapterNumber: number,
+): Promise<ReadingListItem> {
+  const res = await fetch(
+    `${BACKEND_URL}/reading-lists/${readingListId}/items/${mangaId}`,
+    {
+      method: "PATCH",
+      headers: {
+        ...authHeaders(accessToken),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ last_chapter_number: lastChapterNumber }),
+    },
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<ReadingListItem>;
+}
+
 export async function addToReadingList(
   accessToken: string,
   params: {
@@ -142,7 +164,6 @@ export async function addToReadingList(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        provider_id: "mangadex",
         external_manga_id: params.external_manga_id,
         manga_title: params.manga_title,
       }),

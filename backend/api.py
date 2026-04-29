@@ -1,5 +1,5 @@
 """
-Read-only API for the frontend. Wraps db list_entries, get_segments, get_chapter_segments.
+Read-only API for the frontend. Wraps db list_entries, get_panels, get_chapter_panels.
 Run from backend:  uvicorn api:app --reload --host 0.0.0.0 --port 8000
 """
 
@@ -22,7 +22,8 @@ from db.schemas import (
     ReadingListCollectionOut,
     ReadingListCollectionRenameIn,
     ReadingListItemOut,
-    SegmentListOut,
+    ReadingListProgressPatchIn,
+    PanelListOut,
     UserDisplayNamePatchIn,
 )
 
@@ -78,26 +79,23 @@ def list_mangas(
 @router.get("/chapters", response_model=list[ChapterListOut])
 def list_chapters(
     manga_title: str = Query(...),
-    provider_id: str | None = Query(None, description="e.g. local, mangadex"),
     limit: int | None = Query(None, ge=1, le=500, description="Max results (default: all)"),
     offset: int = Query(0, ge=0, description="Skip N results"),
 ):
-    """List chapters (id, chapter_number, created_at, updated_at). Filters by manga_title; optionally by provider_id."""
-    return db.list_chapters(manga_title, provider_id, limit=limit, offset=offset)
+    """List chapters (id, chapter_number, created_at, updated_at). Filters by manga_title."""
+    return db.list_chapters(manga_title, limit=limit, offset=offset)
 
 
-@router.get("/segments", response_model=list[SegmentListOut])
-def get_segments(
-    provider_id: str | None = Query(None, description="e.g. local, mangadex"),
+@router.get("/panels", response_model=list[PanelListOut])
+def get_panels(
     manga_title: str | None = Query(None),
     chapter_number: float | None = Query(None),
     page_number: int | None = Query(None),
     limit: int | None = Query(None, ge=1, le=1000, description="Max results (default: all)"),
     offset: int = Query(0, ge=0, description="Skip N results"),
 ):
-    """Get segments with optional filters. Supports pagination."""
-    return db.get_segments(
-        provider_id=provider_id,
+    """Get panels with optional filters. Supports pagination."""
+    return db.get_panels(
         manga_title=manga_title,
         chapter_number=chapter_number,
         page_number=page_number,
@@ -106,16 +104,17 @@ def get_segments(
     )
 
 
-@router.get("/chapters/segments", response_model=list[SegmentListOut])
-def get_chapter_segments(
-    provider_id: str = Query(..., description="e.g. local, mangadex"),
+@router.get("/chapters/panels", response_model=list[PanelListOut])
+def get_chapter_panels(
     manga_title: str = Query(...),
     chapter_number: float = Query(...),
     limit: int | None = Query(None, ge=1, le=1000, description="Max results (default: all)"),
     offset: int = Query(0, ge=0, description="Skip N results"),
 ):
-    """Get all segments for one chapter. Supports pagination."""
-    return db.get_chapter_segments(provider_id, manga_title, chapter_number, limit=limit, offset=offset)
+    """Get all panels for one chapter. Supports pagination."""
+    return db.get_chapter_panels(manga_title, chapter_number, limit=limit, offset=offset)
+
+
 
 
 # to make sure api is running and responding
@@ -214,14 +213,13 @@ def get_reading_list_items(
 def post_reading_list_item(
     user_id: CurrentUserId, reading_list_id: int, body: ReadingListAddIn
 ):
-    """Add or update a manga on a named list (by provider catalog id)."""
+    """Add or update a manga on a named list (by MangaDex series id)."""
     if db.get_reading_list_collection(user_id, reading_list_id) is None:
         raise HTTPException(status_code=404, detail="Reading list not found")
     try:
         row = db.add_reading_list_item_by_source(
             user_id,
             reading_list_id,
-            body.provider_id,
             body.external_manga_id,
             body.manga_title,
             last_chapter_number=body.last_chapter_number,
@@ -244,6 +242,32 @@ def delete_reading_list_item(
     if not ok:
         raise HTTPException(status_code=404, detail="Not on this reading list")
     return {"ok": True}
+
+
+@router.patch(
+    "/reading-lists/{reading_list_id}/items/{manga_id}",
+    response_model=ReadingListItemOut,
+)
+def patch_reading_list_item_progress(
+    user_id: CurrentUserId,
+    reading_list_id: int,
+    manga_id: int,
+    body: ReadingListProgressPatchIn,
+):
+    """Update last-read chapter for one manga row (stored value only increases)."""
+    ok = db.update_reading_list_item_last_read(
+        user_id,
+        reading_list_id,
+        manga_id,
+        body.last_chapter_number,
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="Not on this reading list")
+    items = db.list_reading_list_items_with_manga(user_id, reading_list_id, limit=500)
+    for it in items:
+        if it.manga_id == manga_id:
+            return it
+    raise HTTPException(status_code=404, detail="Item not found after update")
 
 
 @router.patch("/users/me")

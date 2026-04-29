@@ -159,10 +159,10 @@ class TranslationRequest(BaseModel):
 async def translate_manga_panel(request: TranslationRequest):
     try:
         results = await processor.download_and_process(request.image_url, request.language)
-        return {"status": "success", "data": results}    
+        return {"status": "success", "data": results}
     except Exception as e:
         print(f"Translation Route Error: {e}")
-    
+
 if __name__ == "__main__":
     # processor.process_image("./test_1.jpg", "")
     # show_boxes("./test_1.jpg")

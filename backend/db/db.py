@@ -1,7 +1,7 @@
 """
 Database: SQL (PostgreSQL) via SQLModel.
 
-Schema: Users, reading_list_collection, reading_list_item; Manga → Chapters → Pages → Segments
+Schema: Users, reading_list_collection, reading_list_item; Manga → Chapters → Panels
 
 Utility Functions:
 
@@ -20,27 +20,27 @@ get_connection(db_url=None):
 
 init_db(db_url=None):
     Initializes the database schema by creating tables for all SQLModel models
-    (Users, ReadingListCollection, ReadingListItem, Manga, Chapters, Pages, Segments).
+    (Users, ReadingListCollection, ReadingListItem, Manga, Chapters, Panels).
 
 Other Core Database Functions:
 
-save_page_translation(provider_id, manga_title, chapter_number, page_number, bubbles, language_code, db_url=None):
-    Saves text bubble/segment data for a specific manga page to the database.
+save_panels_translation(manga_title, chapter_number, page_number, panels, language_code, db_url=None):
+    Saves text bubble/panel data for a specific manga page to the database.
 
-get_segments(provider_id=None, manga_title=None, chapter_number=None, page_number=None, db_url=None):
-    Returns all segments (bubbles) matching the specified filters.
+get_panels(manga_title=None, chapter_number=None, page_number=None, db_url=None):
+    Returns all panels (bubbles) matching the specified filters.
 
-get_chapter_segments(provider_id, manga_title, chapter_number, db_url=None):
-    Returns all segments for every page in a single chapter.
+get_chapter_panels(manga_title, chapter_number, db_url=None):
+    Returns all panels for every page in a single chapter.
 
 list_entries(db_url=None, order_by="created_at", order_desc=True):
-    Lists chapters with provider_id, manga_title, chapter_number, and last_updated.
+    Lists chapters with manga_title, chapter_number, and last_updated.
 
-delete_page_segments(provider_id, manga_title, chapter_number, page_number, db_url=None):
-    Removes all segments for a specific page in a chapter.
+delete_page_panels(manga_title, chapter_number, page_number, db_url=None):
+    Removes all panels for a specific page in a chapter.
 
-delete_chapter_segments(provider_id, manga_title, chapter_number, db_url=None):
-    Removes all pages and segments for an entire chapter.
+delete_chapter_panels(manga_title, chapter_number, db_url=None):
+    Removes all panels for an entire chapter.
 """
 
 import os
@@ -49,15 +49,14 @@ from pathlib import Path
 from typing import Optional
 from uuid import UUID
 from sqlalchemy import desc, func
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from .const import PROVIDER_IDS, PROVIDER_LOCAL, PROVIDER_MANGADEX
+# Single-provider setup (MangaDex).
 from .models import (
     Manga,
-    MangaSource,
     Chapters,
-    Pages,
-    Segments,
+    Panels,
     ReadingListCollection,
     ReadingListItem,
     Users,
@@ -66,13 +65,8 @@ from .schemas import (
     ChapterListOut,
     ReadingListCollectionOut,
     ReadingListItemOut,
-    SegmentListOut,
+    PanelListOut,
 )
-
-
-def _validate_provider_id(provider_id: str) -> None:
-    if provider_id not in PROVIDER_IDS:
-        raise ValueError(f"provider_id must be one of {sorted(PROVIDER_IDS)}, got {provider_id!r}")
 
 
 try:
@@ -109,109 +103,98 @@ def get_connection(db_url=None):
 
 
 def init_db(db_url=None):
-    """Create tables: users, reading_list_collection, reading_list_item, manga, manga_source, chapters, pages, segments."""
+    """Create tables: users, reading_list_collection, reading_list_item, manga, chapters, panels."""
     engine = get_engine(db_url)
     SQLModel.metadata.create_all(engine)
 
 
-def _is_placeholder_external_manga_id(external_manga_id: str) -> bool:
-    """Synthetic ids we generate when the provider has no catalog key (local-*, legacy-*)."""
-    return external_manga_id.startswith("legacy-") or external_manga_id.startswith("local-")
-
-
-def _synthetic_external_manga_id(provider_id: str, manga_id: int) -> str:
-    """Stable per-umbrella id for manga_source when no real external id was passed."""
-    if provider_id == PROVIDER_LOCAL:
-        return f"local-{manga_id}"
-    return f"legacy-{manga_id}"
-
-
-def _ensure_manga_source(session, manga_id: int, provider_id: str, external_manga_id: str) -> None:
-    stmt = select(MangaSource).where(
-        MangaSource.manga_id == manga_id,
-        MangaSource.provider_id == provider_id,
-    )
-    row = session.exec(stmt).first()
-    if row:
-        if external_manga_id and not _is_placeholder_external_manga_id(external_manga_id):
-            row.external_manga_id = external_manga_id
-            session.add(row)
-            session.flush()
-        return
-    session.add(
-        MangaSource(
-            manga_id=manga_id,
-            provider_id=provider_id,
-            external_manga_id=external_manga_id,
-        )
-    )
-    session.flush()
-
-
 def resolve_manga_id(
     session,
-    provider_id: str,
     manga_title: str,
     external_manga_id: Optional[str],
 ) -> int:
-    """Find or create umbrella manga and ensure a MangaSource row for this provider."""
-    ext_in = (external_manga_id or "").strip()
-    if ext_in:
-        src = session.exec(
-            select(MangaSource).where(
-                MangaSource.provider_id == provider_id,
-                MangaSource.external_manga_id == ext_in,
-            )
-        ).first()
-        if src:
-            return src.manga_id
+    """Find or create umbrella manga.
 
-    row = session.exec(select(Manga).where(Manga.manga_title == manga_title)).first()
+    If external_manga_id is provided, it is treated as MangaDex series id and stored
+    on Manga.mangadex_manga_id for later lookups.
+
+    MangaDex ids are normalized to lowercase so lookups stay stable. Concurrent
+    inserts for the same series id are merged via DB uniqueness + IntegrityError
+    handling (important when one title is added to several lists in parallel).
+    """
+    title_stripped = (manga_title or "").strip() or "Untitled"
+    ext_raw = (external_manga_id or "").strip()
+    norm_ext = ext_raw.lower() if ext_raw else ""
+
+    if norm_ext:
+        row = session.exec(
+            select(Manga).where(func.lower(Manga.mangadex_manga_id) == norm_ext),
+        ).first()
+        if row:
+            return row.id
+
+    row = session.exec(
+        select(Manga).where(Manga.manga_title == title_stripped),
+    ).first()
     if row:
-        synth = _synthetic_external_manga_id(provider_id, row.id)
-        _ensure_manga_source(session, row.id, provider_id, ext_in or synth)
+        if norm_ext:
+            existing_norm = (row.mangadex_manga_id or "").strip().lower()
+            if existing_norm != norm_ext:
+                row.mangadex_manga_id = norm_ext
+                row.updated_at = datetime.now(timezone.utc)
+                session.add(row)
+                session.flush()
         return row.id
 
-    m = Manga(manga_title=manga_title)
+    if norm_ext:
+        try:
+            with session.begin_nested():
+                m = Manga(manga_title=title_stripped, mangadex_manga_id=norm_ext)
+                session.add(m)
+                session.flush()
+                return m.id
+        except IntegrityError:
+            dup = session.exec(
+                select(Manga).where(
+                    func.lower(Manga.mangadex_manga_id) == norm_ext,
+                ),
+            ).first()
+            if dup is None:
+                raise
+            return dup.id
+
+    m = Manga(manga_title=title_stripped, mangadex_manga_id=None)
     session.add(m)
     session.flush()
-    synth = _synthetic_external_manga_id(provider_id, m.id)
-    _ensure_manga_source(session, m.id, provider_id, ext_in or synth)
     return m.id
 
 
-def resolve_manga_id_by_source(provider_id: str, external_manga_id: str, db_url=None) -> Optional[int]:
-    """Return umbrella manga id for a provider catalog id, if mapped."""
-    _validate_provider_id(provider_id)
-    ext = external_manga_id.strip()
-    if not ext:
-        return None
-    engine = get_engine(db_url)
-    with Session(engine) as session:
-        src = session.exec(
-            select(MangaSource).where(
-                MangaSource.provider_id == provider_id,
-                MangaSource.external_manga_id == ext,
-            )
-        ).first()
-        return src.manga_id if src else None
-
-
 def _get_or_create_chapter(
-    session, manga_id: int, provider_id: str, chapter_number: float, language_code: str
+    session,
+    manga_id: int,
+    chapter_number: float,
+    language_code: str,
+    *,
+    mangadex_chapter_id: Optional[str] = None,
 ) -> int:
     stmt = select(Chapters).where(
         Chapters.manga_id == manga_id,
-        Chapters.provider_id == provider_id,
         Chapters.chapter_number == chapter_number,
     )
     row = session.exec(stmt).first()
     if row:
+        if mangadex_chapter_id is not None:
+            v = mangadex_chapter_id.strip()
+            if v and row.mangadex_chapter_id != v:
+                row.mangadex_chapter_id = v
+                row.updated_at = datetime.now(timezone.utc)
+                session.add(row)
+                session.flush()
         return row.id
     ch = Chapters(
         manga_id=manga_id,
-        provider_id=provider_id,
         chapter_number=chapter_number,
+        mangadex_chapter_id=(mangadex_chapter_id.strip() if mangadex_chapter_id else None),
         language_code=language_code,
     )
     session.add(ch)
@@ -219,134 +202,202 @@ def _get_or_create_chapter(
     return ch.id
 
 
-def _get_or_create_page(session, chapter_id: int, page_number: int) -> int:
-    stmt = select(Pages).where(Pages.chapter_id == chapter_id, Pages.page_number == page_number)
-    row = session.exec(stmt).first()
-    if row:
-        return row.id
-    p = Pages(chapter_id=chapter_id, page_number=page_number)
-    session.add(p)
-    session.flush()
-    return p.id
-
-
-def save_page_translation(
-    provider_id: str,
+def save_panels_translation(
     manga_title: str,
     chapter_number: float,
-    page_number: int,
-    bubbles: list[dict],
+    page_number: Optional[int],
+    panels: list[dict],
     language_code: str,
     *,
     external_manga_id: Optional[str] = None,
+    mangadex_chapter_id: Optional[str] = None,
     db_url=None,
 ) -> None:
-    """Save one page's segments (replace existing for this provider/manga/chapter/page)."""
-    _validate_provider_id(provider_id)
+    """Save panels (replace existing for this manga/chapter/page)."""
     engine = get_engine(db_url)
     with Session(engine) as session:
-        manga_id = resolve_manga_id(session, provider_id, manga_title, external_manga_id)
-        chapter_id = _get_or_create_chapter(session, manga_id, provider_id, chapter_number, language_code)
-        page_id = _get_or_create_page(session, chapter_id, page_number)
-        for s in session.exec(select(Segments).where(Segments.page_id == page_id)).all():
-            session.delete(s)
+        manga_id = resolve_manga_id(session, manga_title, external_manga_id)
+        chapter_id = _get_or_create_chapter(
+            session,
+            manga_id,
+            chapter_number,
+            language_code,
+            mangadex_chapter_id=mangadex_chapter_id,
+        )
+        for p in session.exec(
+            select(Panels).where(Panels.chapter_id == chapter_id, Panels.page_number == page_number)
+        ).all():
+            session.delete(p)
         session.flush()
-        for b in bubbles:
-            seg = Segments(
-                page_id=page_id,
-                segment_index=b["bubble_index"],
-                x1=b["x1"], y1=b["y1"], x2=b["x2"], y2=b["y2"],
-                original_text=b["original_text"],
-                translated_text=b["translated_text"],
+        for panel in panels:
+            row = Panels(
+                chapter_id=chapter_id,
+                page_number=page_number,
+                mangadex_chapter_id=(mangadex_chapter_id.strip() if mangadex_chapter_id else None),
+                bubble_index=panel["bubble_index"],
+                width=panel.get("width"),
+                height=panel.get("height"),
+                panel_url=panel.get("panel_url"),
+                x1=panel["x1"],
+                y1=panel["y1"],
+                x2=panel["x2"],
+                y2=panel["y2"],
+                original_text=panel["original_text"],
+                translated_text=panel["translated_text"],
             )
-            session.add(seg)
+            session.add(row)
         now = datetime.now(timezone.utc)
-        page = session.get(Pages, page_id)
-        if page:
-            page.updated_at = now
-            chapter = session.get(Chapters, page.chapter_id)
-            if chapter:
-                chapter.updated_at = now
-                manga = session.get(Manga, chapter.manga_id)
-                if manga:
-                    manga.updated_at = now
+        chapter = session.get(Chapters, chapter_id)
+        if chapter:
+            chapter.updated_at = now
+            manga = session.get(Manga, chapter.manga_id)
+            if manga:
+                manga.updated_at = now
         session.commit()
 
 
-def delete_page_segments(
-    provider_id: str,
+# Backwards-compatible alias (older code/tests may still import this name).
+save_panel_translation = save_panels_translation
+
+
+def upsert_panel_translation(
     manga_title: str,
     chapter_number: float,
-    page_number: int,
+    page_number: Optional[int],
+    panel: dict,
+    language_code: str,
+    *,
+    external_manga_id: Optional[str] = None,
+    mangadex_chapter_id: Optional[str] = None,
     db_url=None,
 ) -> None:
-    """Delete all segments for one page and the page row."""
-    _validate_provider_id(provider_id)
+    """Insert/update a single panel without deleting other panels.
+
+    If panel_url is provided, uniqueness is treated as (chapter_id, page_number, panel_url).
+    Otherwise falls back to (chapter_id, page_number, bubble_index).
+    """
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        manga_id = resolve_manga_id(session, manga_title, external_manga_id)
+        chapter_id = _get_or_create_chapter(
+            session,
+            manga_id,
+            chapter_number,
+            language_code,
+            mangadex_chapter_id=mangadex_chapter_id,
+        )
+
+        bubble_index = panel["bubble_index"]
+        panel_url = panel.get("panel_url")
+        panel_url = panel_url.strip() if isinstance(panel_url, str) else None
+        if panel_url:
+            existing = session.exec(
+                select(Panels).where(
+                    Panels.chapter_id == chapter_id,
+                    Panels.page_number == page_number,
+                    Panels.panel_url == panel_url,
+                )
+            ).first()
+        else:
+            existing = session.exec(
+                select(Panels).where(
+                    Panels.chapter_id == chapter_id,
+                    Panels.page_number == page_number,
+                    Panels.bubble_index == bubble_index,
+                )
+            ).first()
+
+        mdx = mangadex_chapter_id.strip() if mangadex_chapter_id else None
+        if existing:
+            existing.mangadex_chapter_id = mdx
+            existing.panel_url = panel_url
+            existing.bubble_index = bubble_index
+            existing.width = panel.get("width")
+            existing.height = panel.get("height")
+            existing.x1 = panel["x1"]
+            existing.y1 = panel["y1"]
+            existing.x2 = panel["x2"]
+            existing.y2 = panel["y2"]
+            existing.original_text = panel["original_text"]
+            existing.translated_text = panel["translated_text"]
+            session.add(existing)
+        else:
+            row = Panels(
+                chapter_id=chapter_id,
+                page_number=page_number,
+                mangadex_chapter_id=mdx,
+                bubble_index=bubble_index,
+                width=panel.get("width"),
+                height=panel.get("height"),
+                panel_url=panel_url,
+                x1=panel["x1"],
+                y1=panel["y1"],
+                x2=panel["x2"],
+                y2=panel["y2"],
+                original_text=panel["original_text"],
+                translated_text=panel["translated_text"],
+            )
+            session.add(row)
+
+        now = datetime.now(timezone.utc)
+        chapter = session.get(Chapters, chapter_id)
+        if chapter:
+            chapter.updated_at = now
+            manga = session.get(Manga, chapter.manga_id)
+            if manga:
+                manga.updated_at = now
+        session.commit()
+
+
+def delete_page_panels(
+    manga_title: str,
+    chapter_number: float,
+    page_number: Optional[int],
+    db_url=None,
+) -> None:
+    """Delete all panels for one page."""
     engine = get_engine(db_url)
     with Session(engine) as session:
         m = session.exec(select(Manga).where(Manga.manga_title == manga_title)).first()
         if not m:
             return
-        ch_stmt = select(Chapters).where(
-            Chapters.manga_id == m.id,
-            Chapters.provider_id == provider_id,
-            Chapters.chapter_number == chapter_number,
-        )
+        ch_stmt = select(Chapters).where(Chapters.manga_id == m.id, Chapters.chapter_number == chapter_number)
         ch = session.exec(ch_stmt).first()
         if not ch:
             return
-        page_stmt = select(Pages).where(Pages.chapter_id == ch.id, Pages.page_number == page_number)
-        page = session.exec(page_stmt).first()
-        if not page:
-            return
-        for seg in session.exec(select(Segments).where(Segments.page_id == page.id)).all():
-            session.delete(seg)
-        session.flush()
-        session.delete(page)
+        for p in session.exec(
+            select(Panels).where(Panels.chapter_id == ch.id, Panels.page_number == page_number)
+        ).all():
+            session.delete(p)
         session.commit()
 
 
-def delete_chapter_segments(
-    provider_id: str,
+def delete_chapter_panels(
     manga_title: str,
     chapter_number: float,
     db_url=None,
 ) -> None:
-    """Delete chapter and all its pages/segments (explicit deletes; DB may not have CASCADE)."""
-    _validate_provider_id(provider_id)
+    """Delete chapter and all its panels (explicit deletes; DB may not have CASCADE)."""
     engine = get_engine(db_url)
     with Session(engine) as session:
         m = session.exec(select(Manga).where(Manga.manga_title == manga_title)).first()
         if not m:
             return
-        ch = session.exec(
-            select(Chapters).where(
-                Chapters.manga_id == m.id,
-                Chapters.provider_id == provider_id,
-                Chapters.chapter_number == chapter_number,
-            )
-        ).first()
+        ch = session.exec(select(Chapters).where(Chapters.manga_id == m.id, Chapters.chapter_number == chapter_number)).first()
         if not ch:
             return
-        pages = list(session.exec(select(Pages).where(Pages.chapter_id == ch.id)).all())
-        for page in pages:
-            for seg in session.exec(select(Segments).where(Segments.page_id == page.id)).all():
-                session.delete(seg)
-        session.flush()
-        for page in pages:
-            session.delete(page)
+        for p in session.exec(select(Panels).where(Panels.chapter_id == ch.id)).all():
+            session.delete(p)
         session.flush()
         session.delete(ch)
         session.commit()
 
 
 def delete_all_manga(db_url=None) -> None:
-    """Delete all segments, pages, chapters, reading-list rows, manga_source rows, and manga rows."""
+    """Delete all panels, chapters, reading-list rows, and manga rows."""
     engine = get_engine(db_url)
     with Session(engine) as session:
-        for seg in session.exec(select(Segments)).all():
-            session.delete(seg)
-        for p in session.exec(select(Pages)).all():
+        for p in session.exec(select(Panels)).all():
             session.delete(p)
         for ch in session.exec(select(Chapters)).all():
             session.delete(ch)
@@ -354,83 +405,231 @@ def delete_all_manga(db_url=None) -> None:
             session.delete(rli)
         for rlc in session.exec(select(ReadingListCollection)).all():
             session.delete(rlc)
-        for ms in session.exec(select(MangaSource)).all():
-            session.delete(ms)
         for m in session.exec(select(Manga)).all():
             session.delete(m)
         session.commit()
 
 
-def get_segments(
-    provider_id: Optional[str] = None,
+def get_panels(
     manga_title: Optional[str] = None,
     chapter_number: Optional[float] = None,
     page_number: Optional[int] = None,
     limit: Optional[int] = None,
     offset: int = 0,
     db_url=None,
-) -> list[SegmentListOut]:
-    """Query segments; provider_id filters on chapter. Supports limit/offset for pagination."""
-    if provider_id is not None:
-        _validate_provider_id(provider_id)
+) -> list[PanelListOut]:
+    """Query panels. Supports limit/offset for pagination.
+    """
     engine = get_engine(db_url)
     with Session(engine) as session:
         stmt = (
             select(
-                Segments.id,
-                Chapters.provider_id,
+                Panels.id,
                 Manga.manga_title,
                 Chapters.chapter_number,
-                Pages.page_number,
-                Segments.segment_index,
-                Segments.x1, Segments.y1, Segments.x2, Segments.y2,
-                Segments.original_text,
-                Segments.translated_text,
+                Chapters.mangadex_chapter_id,
+                Panels.page_number,
+                Panels.bubble_index,
+                Panels.width,
+                Panels.height,
+                Panels.x1, Panels.y1, Panels.x2, Panels.y2,
+                Panels.original_text,
+                Panels.translated_text,
+                Panels.panel_url,
                 Chapters.language_code,
-                Segments.created_at,
+                Panels.created_at,
             )
-            .select_from(Segments)
-            .join(Pages, Segments.page_id == Pages.id)
-            .join(Chapters, Pages.chapter_id == Chapters.id)
+            .select_from(Panels)
+            .join(Chapters, Panels.chapter_id == Chapters.id)
             .join(Manga, Chapters.manga_id == Manga.id)
         )
-        if provider_id is not None:
-            stmt = stmt.where(Chapters.provider_id == provider_id)
         if manga_title is not None:
             stmt = stmt.where(Manga.manga_title == manga_title)
         if chapter_number is not None:
             stmt = stmt.where(Chapters.chapter_number == chapter_number)
         if page_number is not None:
-            stmt = stmt.where(Pages.page_number == page_number)
-        stmt = stmt.order_by(Chapters.chapter_number, Pages.page_number, Segments.segment_index)
+            stmt = stmt.where(Panels.page_number == page_number)
+        stmt = stmt.order_by(
+            Chapters.chapter_number,
+            func.coalesce(Panels.page_number, 0),
+            Panels.bubble_index,
+        )
         if offset > 0:
             stmt = stmt.offset(offset)
         if limit is not None and limit > 0:
             stmt = stmt.limit(limit)
         rows = session.exec(stmt).all()
         return [
-            SegmentListOut(
-                id=r[0], provider_id=r[1], manga_title=r[2], chapter_number=r[3],
-                page_number=r[4], segment_index=r[5], x1=r[6], y1=r[7], x2=r[8],
-                y2=r[9], original_text=r[10], translated_text=r[11], language_code=r[12],
-                created_at=r[13],
+            PanelListOut(
+                id=r[0],
+                manga_title=r[1],
+                chapter_number=r[2],
+                mangadex_chapter_id=r[3],
+                page_number=r[4],
+                bubble_index=r[5],
+                width=r[6],
+                height=r[7],
+                x1=r[8],
+                y1=r[9],
+                x2=r[10],
+                y2=r[11],
+                original_text=r[12],
+                translated_text=r[13],
+                panel_url=r[14],
+                language_code=r[15],
+                created_at=r[16],
             )
             for r in rows
         ]
 
 
-def get_chapter_segments(
-    provider_id: str,
+def get_panel_by_panel_url(
+    panel_url: str,
+    *,
+    manga_title: Optional[str] = None,
+    chapter_number: Optional[float] = None,
+    mangadex_chapter_id: Optional[str] = None,
+    page_number: Optional[int] = None,
+    db_url=None,
+) -> Optional[PanelListOut]:
+    """Return the first matching panel for panel_url (or None)."""
+    url = (panel_url or "").strip()
+    if not url:
+        return None
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        stmt = (
+            select(
+                Panels.id,
+                Manga.manga_title,
+                Chapters.chapter_number,
+                Chapters.mangadex_chapter_id,
+                Panels.page_number,
+                Panels.bubble_index,
+                Panels.width,
+                Panels.height,
+                Panels.x1,
+                Panels.y1,
+                Panels.x2,
+                Panels.y2,
+                Panels.original_text,
+                Panels.translated_text,
+                Panels.panel_url,
+                Chapters.language_code,
+                Panels.created_at,
+            )
+            .select_from(Panels)
+            .join(Chapters, Panels.chapter_id == Chapters.id)
+            .join(Manga, Chapters.manga_id == Manga.id)
+            .where(Panels.panel_url == url)
+        )
+        if manga_title is not None:
+            stmt = stmt.where(Manga.manga_title == manga_title)
+        if chapter_number is not None:
+            stmt = stmt.where(Chapters.chapter_number == chapter_number)
+        if mangadex_chapter_id is not None:
+            v = mangadex_chapter_id.strip()
+            if v:
+                stmt = stmt.where(Chapters.mangadex_chapter_id == v)
+        if page_number is not None:
+            stmt = stmt.where(Panels.page_number == page_number)
+        stmt = stmt.order_by(
+            Chapters.chapter_number,
+            func.coalesce(Panels.page_number, 0),
+            Panels.bubble_index,
+        ).limit(1)
+        r = session.exec(stmt).first()
+        if not r:
+            return None
+        return PanelListOut(
+            id=r[0],
+            manga_title=r[1],
+            chapter_number=r[2],
+            mangadex_chapter_id=r[3],
+            page_number=r[4],
+            bubble_index=r[5],
+            width=r[6],
+            height=r[7],
+            x1=r[8],
+            y1=r[9],
+            x2=r[10],
+            y2=r[11],
+            original_text=r[12],
+            translated_text=r[13],
+            panel_url=r[14],
+            language_code=r[15],
+            created_at=r[16],
+        )
+
+
+def delete_panel_by_panel_url(
+    panel_url: str,
+    *,
+    manga_title: Optional[str] = None,
+    chapter_number: Optional[float] = None,
+    mangadex_chapter_id: Optional[str] = None,
+    page_number: Optional[int] = None,
+    db_url=None,
+) -> int:
+    """Delete panel rows matching panel_url (optionally scoped).
+
+    Returns number of deleted rows.
+    """
+    url = (panel_url or "").strip()
+    if not url:
+        return 0
+    engine = get_engine(db_url)
+    with Session(engine) as session:
+        stmt = select(Panels).where(Panels.panel_url == url)
+        if (
+            manga_title is not None
+            or chapter_number is not None
+            or mangadex_chapter_id is not None
+        ):
+            stmt = stmt.join(Chapters, Panels.chapter_id == Chapters.id).join(
+                Manga, Chapters.manga_id == Manga.id
+            )
+            if manga_title is not None:
+                stmt = stmt.where(Manga.manga_title == manga_title)
+            if chapter_number is not None:
+                stmt = stmt.where(Chapters.chapter_number == chapter_number)
+            if mangadex_chapter_id is not None:
+                v = mangadex_chapter_id.strip()
+                if v:
+                    stmt = stmt.where(Chapters.mangadex_chapter_id == v)
+        if page_number is not None:
+            stmt = stmt.where(Panels.page_number == page_number)
+
+        panels = session.exec(stmt).all()
+        if not panels:
+            return 0
+
+        chapter_ids = {p.chapter_id for p in panels}
+        for p in panels:
+            session.delete(p)
+        session.flush()
+
+        now = datetime.now(timezone.utc)
+        for cid in chapter_ids:
+            chapter = session.get(Chapters, cid)
+            if chapter:
+                chapter.updated_at = now
+                manga = session.get(Manga, chapter.manga_id)
+                if manga:
+                    manga.updated_at = now
+        session.commit()
+        return len(panels)
+
+
+def get_chapter_panels(
     manga_title: str,
     chapter_number: float,
     limit: Optional[int] = None,
     offset: int = 0,
     db_url=None,
-) -> list[SegmentListOut]:
-    """Get all segments for a chapter. Supports limit/offset for pagination."""
-    _validate_provider_id(provider_id)
-    return get_segments(
-        provider_id=provider_id,
+) -> list[PanelListOut]:
+    """Get all panels for a chapter. Supports limit/offset for pagination."""
+    return get_panels(
         manga_title=manga_title,
         chapter_number=chapter_number,
         limit=limit,
@@ -439,25 +638,29 @@ def get_chapter_segments(
     )
 
 
+
 def list_chapters(
     manga_title: str,
-    provider_id: Optional[str] = None,
     limit: Optional[int] = None,
     offset: int = 0,
     db_url=None,
 ) -> list[ChapterListOut]:
-    """List chapters for an umbrella manga_title; optionally filter by chapter provider_id."""
+    """List chapters for an umbrella manga_title."""
     engine = get_engine(db_url)
     with Session(engine) as session:
         stmt = (
-            select(Manga.manga_title, Chapters.provider_id, Chapters.id, Chapters.chapter_number, Chapters.created_at, Chapters.updated_at)
+            select(
+                Manga.manga_title,
+                Chapters.id,
+                Chapters.chapter_number,
+                Chapters.mangadex_chapter_id,
+                Chapters.created_at,
+                Chapters.updated_at,
+            )
             .select_from(Chapters)
             .join(Manga, Chapters.manga_id == Manga.id)
             .where(Manga.manga_title == manga_title)
         )
-        if provider_id is not None:
-            _validate_provider_id(provider_id)
-            stmt = stmt.where(Chapters.provider_id == provider_id)
         if offset > 0:
             stmt = stmt.offset(offset)
         if limit is not None and limit > 0:
@@ -465,8 +668,12 @@ def list_chapters(
         rows = session.exec(stmt).all()
         return [
             ChapterListOut(
-                manga_title=r[0], provider_id=r[1], id=r[2], chapter_number=r[3],
-                created_at=r[4], updated_at=r[5],
+                manga_title=r[0],
+                id=r[1],
+                chapter_number=r[2],
+                mangadex_chapter_id=r[3],
+                created_at=r[4],
+                updated_at=r[5],
             )
             for r in rows
         ]
@@ -658,13 +865,8 @@ def list_reading_list_collections_with_counts(
         if ids:
             rows = list(
                 session.exec(
-                    select(ReadingListItem, MangaSource)
+                    select(ReadingListItem, Manga)
                     .join(Manga, ReadingListItem.manga_id == Manga.id)
-                    .outerjoin(
-                        MangaSource,
-                        (MangaSource.manga_id == Manga.id)
-                        & (MangaSource.provider_id == PROVIDER_MANGADEX),
-                    )
                     .where(ReadingListItem.reading_list_id.in_(ids))
                     .order_by(
                         ReadingListItem.reading_list_id,
@@ -672,20 +874,11 @@ def list_reading_list_collections_with_counts(
                     )
                 ).all()
             )
-            for item, src in rows:
+            for item, manga in rows:
                 lid = item.reading_list_id
                 if lid in latest_ext:
                     continue
-                ext: Optional[str] = None
-                if (
-                    src
-                    and src.external_manga_id
-                    and not _is_placeholder_external_manga_id(
-                        src.external_manga_id
-                    )
-                ):
-                    ext = src.external_manga_id
-                latest_ext[lid] = ext
+                latest_ext[lid] = manga.mangadex_manga_id
     return [
         ReadingListCollectionOut(
             id=c.id,
@@ -712,13 +905,8 @@ def list_reading_list_items_with_manga(
     engine = get_engine(db_url)
     with Session(engine) as session:
         stmt = (
-            select(ReadingListItem, Manga, MangaSource)
+            select(ReadingListItem, Manga)
             .join(Manga, ReadingListItem.manga_id == Manga.id)
-            .outerjoin(
-                MangaSource,
-                (MangaSource.manga_id == Manga.id)
-                & (MangaSource.provider_id == PROVIDER_MANGADEX),
-            )
             .where(ReadingListItem.reading_list_id == reading_list_id)
             .order_by(desc(ReadingListItem.updated_at))
         )
@@ -728,12 +916,8 @@ def list_reading_list_items_with_manga(
             stmt = stmt.limit(limit)
         rows = session.exec(stmt).all()
     out: list[ReadingListItemOut] = []
-    for item, manga, src in rows:
-        ext = None
-        if src and src.external_manga_id and not _is_placeholder_external_manga_id(
-            src.external_manga_id
-        ):
-            ext = src.external_manga_id
+    for item, manga in rows:
+        ext = manga.mangadex_manga_id
         out.append(
             ReadingListItemOut(
                 id=item.id,
@@ -774,7 +958,10 @@ def upsert_reading_list_item(
         row = session.exec(stmt).first()
         if row:
             if last_chapter_number is not None:
-                row.last_chapter_number = last_chapter_number
+                new_val = float(last_chapter_number)
+                prev = row.last_chapter_number
+                if prev is None or new_val > prev:
+                    row.last_chapter_number = new_val
             row.updated_at = now
             session.add(row)
             col.updated_at = now
@@ -795,6 +982,47 @@ def upsert_reading_list_item(
         session.commit()
         session.refresh(entry)
         return entry
+
+
+def update_reading_list_item_last_read(
+    user_id: UUID,
+    reading_list_id: int,
+    manga_id: int,
+    last_chapter_number: float,
+    *,
+    db_url=None,
+) -> bool:
+    """Set last-read chapter for one list row (only increases stored value)."""
+    if get_reading_list_collection(user_id, reading_list_id, db_url) is None:
+        return False
+    engine = get_engine(db_url)
+    now = datetime.now(timezone.utc)
+    new_val = float(last_chapter_number)
+    with Session(engine) as session:
+        row = session.exec(
+            select(ReadingListItem).where(
+                ReadingListItem.reading_list_id == reading_list_id,
+                ReadingListItem.manga_id == manga_id,
+            )
+        ).first()
+        if row is None:
+            return False
+        prev = row.last_chapter_number
+        if prev is None or new_val > prev:
+            row.last_chapter_number = new_val
+        row.updated_at = now
+        session.add(row)
+        col = session.exec(
+            select(ReadingListCollection).where(
+                ReadingListCollection.id == reading_list_id,
+                ReadingListCollection.user_id == user_id,
+            )
+        ).first()
+        if col:
+            col.updated_at = now
+            session.add(col)
+        session.commit()
+        return True
 
 
 def remove_reading_list_item_from_list(
@@ -828,21 +1056,19 @@ def remove_reading_list_item_from_list(
 def add_reading_list_item_by_source(
     user_id: UUID,
     reading_list_id: int,
-    provider_id: str,
     external_manga_id: str,
     manga_title: str,
     *,
     last_chapter_number: Optional[float] = None,
     db_url=None,
 ) -> ReadingListItem:
-    _validate_provider_id(provider_id)
     ext = (external_manga_id or "").strip()
     title = (manga_title or "").strip() or "Untitled"
     if not ext:
         raise ValueError("external_manga_id is required")
     engine = get_engine(db_url)
     with Session(engine) as session:
-        manga_id = resolve_manga_id(session, provider_id, title, ext)
+        manga_id = resolve_manga_id(session, title, ext)
         session.commit()
     return upsert_reading_list_item(
         user_id,

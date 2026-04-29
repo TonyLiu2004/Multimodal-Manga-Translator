@@ -21,10 +21,8 @@ except ImportError:
 # Import all models so they're registered with SQLModel.metadata
 from db.models import (
     Manga,
-    MangaSource,
     Chapters,
-    Pages,
-    Segments,
+    Panels,
     Users,
     ReadingListCollection,
     ReadingListItem,

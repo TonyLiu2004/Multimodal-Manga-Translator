@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +28,7 @@ import {
   fetchChaptersForManga,
   hydrateMangaCovers,
   hydrateMangaInfos,
+  parseChapterNumber,
   pickChapterForListItem,
   titleForListItem,
   type MangaPublicInfo,
@@ -76,12 +78,18 @@ export default function ReadingListDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [openingReaderKey, setOpeningReaderKey] = useState<string | null>(null);
+  const skipNextFocusRefresh = useRef(true);
 
   const [popupVisible, setPopupVisible] = useState(false);
   const [popupManga, setPopupManga] = useState<Manga | null>(null);
   const [popupCoverArt, setPopupCoverArt] = useState(COVER_PLACEHOLDER);
   const [popupChapters, setPopupChapters] = useState<Chapter[]>([]);
   const [popupChaptersLoading, setPopupChaptersLoading] = useState(false);
+  /** When set, chapter taps in PopUp sync last-read to this list row. */
+  const [popupReadingListProgress, setPopupReadingListProgress] = useState<{
+    readingListId: number;
+    mangaId: number;
+  } | null>(null);
 
   const loadItems = useCallback(async () => {
     if (!session?.access_token || !Number.isFinite(listId)) return;
@@ -116,6 +124,17 @@ export default function ReadingListDetailScreen() {
     void loadItems().finally(() => setLoading(false));
   }, [authLoading, session, listId, loadItems, router]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (skipNextFocusRefresh.current) {
+        skipNextFocusRefresh.current = false;
+        return;
+      }
+      if (!session?.access_token || !Number.isFinite(listId)) return;
+      void loadItems();
+    }, [session?.access_token, listId, loadItems]),
+  );
+
   const onRefresh = useCallback(async () => {
     if (!session?.access_token) return;
     setRefreshing(true);
@@ -146,7 +165,18 @@ export default function ReadingListDetailScreen() {
         Alert.alert("No chapters", "No chapters were found for this title.");
         return;
       }
-      router.push(`/reader/${chapter.id}` as Href);
+      const chNum = parseChapterNumber(chapter.chapter);
+      const q = new URLSearchParams();
+      q.set("seriesId", extId);
+      if (chNum != null) {
+        q.set("readingListId", String(listId));
+        q.set("mangaId", String(item.manga_id));
+        q.set("chapterNumber", String(chNum));
+      }
+      const qs = q.toString();
+      router.push(
+        (qs ? `/reader/${chapter.id}?${qs}` : `/reader/${chapter.id}`) as Href,
+      );
     } catch {
       Alert.alert("Error", "Could not load chapters for this title.");
     } finally {
@@ -163,11 +193,19 @@ export default function ReadingListDetailScreen() {
       setPopupVisible(true);
       setPopupChapters([]);
       setPopupChaptersLoading(true);
+      if (Number.isFinite(listId)) {
+        setPopupReadingListProgress({
+          readingListId: listId,
+          mangaId: item.manga_id,
+        });
+      } else {
+        setPopupReadingListProgress(null);
+      }
       void fetchChaptersForManga(extId)
         .then(setPopupChapters)
         .finally(() => setPopupChaptersLoading(false));
     },
-    [mangaInfos, coverUrls],
+    [mangaInfos, coverUrls, listId],
   );
 
   const closeDetailPopup = useCallback(() => {
@@ -176,6 +214,7 @@ export default function ReadingListDetailScreen() {
     setPopupChapters([]);
     setPopupChaptersLoading(false);
     setPopupCoverArt(COVER_PLACEHOLDER);
+    setPopupReadingListProgress(null);
   }, []);
 
   const onRemoveItem = async (mangaId: number) => {
@@ -299,8 +338,13 @@ export default function ReadingListDetailScreen() {
                       openingThisTile={openingReaderKey === rk}
                       readerBusy={readerBusy}
                       removing={removingKey === rk}
-                      onCoverPress={() => void openReaderForItem(item, rk)}
+                      onCoverPress={() => {
+                        if (extId != null) openDetailPopup(item, extId);
+                      }}
                       onChapterPress={() => void openReaderForItem(item, rk)}
+                      onTitlePress={() => {
+                        if (extId != null) openDetailPopup(item, extId);
+                      }}
                       onReadMore={() => {
                         if (extId != null) openDetailPopup(item, extId);
                       }}
@@ -329,6 +373,7 @@ export default function ReadingListDetailScreen() {
           chapters={popupChapters}
           loadingChapters={popupChaptersLoading}
           onClose={closeDetailPopup}
+          readingListProgress={popupReadingListProgress ?? undefined}
         />
       ) : null}
     </SafeAreaView>

@@ -15,6 +15,20 @@ Deployed Backend URL: https://tonyliu404-manglify-backend.hf.space/
 
 - Huggingface Page: https://huggingface.co/spaces/tonyliu404/Manglify_Backend
 
+### Hugging Face backend: why the DB is “missing”
+
+GitHub Actions only pushes the **`backend/`** folder to the Space. **`backend/.env` is gitignored**, so **`DATABASE_URL` is never deployed** unless you add it yourself.
+
+On the Space: **Settings → Variables and secrets** (repository secrets), create:
+
+- **`DATABASE_URL`** — PostgreSQL URL for your hosted DB (for example Supabase). Many hosts need TLS; try appending **`?sslmode=require`** if connections fail. Use **`postgresql+psycopg2://user:pass@host:5432/db`** if your URL omits the driver.
+
+For authenticated routes (reading lists, profile):
+
+- **`SUPABASE_JWT_SECRET`**, **or** **`SUPABASE_URL`** plus **`SUPABASE_ANON_KEY`** (same behavior as local `auth_supabase.py`).
+
+Restart or redeploy the Space after saving secrets. Verify DB connectivity with **`GET /health/db`** on the deployed API. Run **`alembic upgrade head`** from your machine with that same **`DATABASE_URL`** so schema matches production.
+
 ## Prerequisites
 
 - Windows Users: Docker Desktop with the WSL 2 backend enabled.

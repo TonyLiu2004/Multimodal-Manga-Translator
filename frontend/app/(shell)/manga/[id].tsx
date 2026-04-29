@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { BACKEND_URL } from "@/config";
 import { Manga, Chapter } from "@/lib/mangaTypes";
+import { parseChapterNumber } from "@/lib/readingListDetailManga";
 import { useAuth } from "@/context/AuthContext";
 import {
   addToReadingList,
@@ -22,6 +23,7 @@ import {
 export default function MangaDetailsPage() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const seriesId = Array.isArray(id) ? id[0] : id;
   const { session } = useAuth();
 
   const [manga, setManga] = useState<any | null>(null);
@@ -214,7 +216,22 @@ export default function MangaDetailsPage() {
               <Pressable
                 key={chapter.id}
                 style={styles.chapterItem}
-                onPress={() => router.push(`/reader/${chapter.id}`)}
+                onPress={() => {
+                  const q = new URLSearchParams();
+                  if (seriesId != null && seriesId !== "") {
+                    q.set("seriesId", String(seriesId));
+                  }
+                  const chNum = parseChapterNumber(chapter.chapter);
+                  if (chNum != null) {
+                    q.set("chapterNumber", String(chNum));
+                  }
+                  const qs = q.toString();
+                  router.push(
+                    (qs
+                      ? `/reader/${chapter.id}?${qs}`
+                      : `/reader/${chapter.id}`) as Href,
+                  );
+                }}
               >
                 <View style={styles.chapterRow}>
                   <Text style={styles.chapterNumber}>Ch. {chapter.chapter}</Text>
