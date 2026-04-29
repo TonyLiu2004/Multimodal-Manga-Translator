@@ -8,17 +8,18 @@ import { AuthProvider } from "@/context/AuthContext";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts(Ionicons.font);
+  // Static / react-server bundle exposes a stub `useFonts` that returns [] — don't treat that as “still loading”.
+  const fontHook = useFonts(Ionicons.font);
+  const raw = fontHook as unknown as readonly unknown[];
+  const serverStub = raw.length === 0;
+  const fontsLoaded = raw[0] as boolean | undefined;
+  const fontError = raw[1] as Error | null | undefined;
 
   useEffect(() => {
-    if (fontsLoaded || fontError != null) {
+    if (serverStub || fontsLoaded || fontError != null) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded, fontError]);
-
-  if (!fontsLoaded && fontError == null) {
-    return null;
-  }
+  }, [serverStub, fontsLoaded, fontError]);
 
   return (
     <AuthProvider>
