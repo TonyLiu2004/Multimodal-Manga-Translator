@@ -7,8 +7,8 @@ import re
 import io
 import db
 import torch
-from sqlmodel import Session
-from db.models import Panels
+from sqlmodel import Session, select
+from db.models import Panels, Chapters
 from pathlib import Path
 from helpers import get_project_root, setup_fonts
 from manga_ocr import MangaOcr
@@ -94,9 +94,16 @@ class ImageProcessor:
     def save_to_db(self, results, url, chapter_id, page_number):
         engine = db.get_engine()
         with Session(engine) as session:
+            statement = select(Chapters).where(Chapters.mangadex_chapter_id == chapter_id)
+            chapter_record = session.exec(statement).first()
+            
+            if not chapter_record:
+                raise ValueError(f"Chapter not found in db for chapter_id: {chapter_id}")
+            
             for res in results:
                 panel = Panels(
-                    chapter_id=chapter_id,
+                    chapter_id=chapter_record.id,
+                    mangadex_chapter_id=chapter_id,
                     page_number=page_number,
                     panel_url=url,
                     original_text=res['original_text'],

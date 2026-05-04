@@ -16,8 +16,8 @@ import httpx
 import urllib.parse
 import db
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, text
-from db.models import Manga
+from sqlmodel import Session, text, select
+from db.models import Manga, Chapters, Panels
 from auth_supabase import CurrentAuthContext, CurrentUserId
 from db.schemas import (
     ChapterListOut,
@@ -334,13 +334,35 @@ async def proxy_image(
 @router.get("/api/manga/chapter/{chapter_id}/pages")
 def get_chapter_page_urls(chapter_id: str):
     """MangaDex at-home CDN URLs for every page in a chapter (for client readers)."""
+    # TODO:  Integration with DB 
+    # # Will need manga table access and population before below can be done
+    # # Create entry in Chapters table if it doesn't exist
+    # engine = db.get_engine()
+    # with Session(engine) as session:
+    #     statement = select(Chapters).where(Chapters.mangadex_chapter_id == chapter_id)
+    #     chapter = session.exec(statement).first()
+        
+    #     if not chapter:
+    #         new_chapter = Chapters(
+    #             mangadex_chapter_id=chapter_id,
+    #             # someone with better knowledge on working with dbs please help 
+    #         )
+    #         session.add(new_chapter)
+    #         session.commit()
+    #         session.refresh(new_chapter)
+    #         print(f"Created new chapter entry for {chapter_id}")
+    
     urls = mangadex_service.get_chapter_panel_urls(chapter_id)
     if not urls:
         raise HTTPException(status_code=404, detail="No pages for this chapter")
     
+    # proxied_urls = [
+    #     f"{BACKEND_URL}/api/proxy/image?target_url={urllib.parse.quote_plus(url)}&chapter_id={chapter_id}&page={i}" 
+    #     for i, url in enumerate(urls)
+    # ]
     proxied_urls = [
-        f"{BACKEND_URL}/api/proxy/image?target_url={urllib.parse.quote_plus(url)}&chapter_id={chapter_id}&page={i}" 
-        for i, url in enumerate(urls)
+        f"{BACKEND_URL}/api/proxy/image?target_url={urllib.parse.quote_plus(url)}" 
+        for url in urls
     ]
 
     print(proxied_urls)
