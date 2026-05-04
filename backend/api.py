@@ -312,24 +312,26 @@ def patch_me_display_name(ctx: CurrentAuthContext, body: UserDisplayNamePatchIn)
 
 
 @router.get("/api/proxy/image")
-async def proxy_image(
-    background_tasks: BackgroundTasks,
-    target_url: str = Query(...), 
-    chapter_id: Optional[str] = Query(None),
-    page: Optional[int] = Query(None)
-):
-    image_bytes = await proxy.get_manga_page_stream(target_url)
+async def proxy_image(target_url: str):
+    return await proxy.get_manga_page_stream(target_url)
+# async def proxy_image(
+#     background_tasks: BackgroundTasks,
+#     target_url: str = Query(...), 
+#     chapter_id: Optional[str] = Query(None),
+#     page: Optional[int] = Query(None)
+# ):
+#     image_bytes = await proxy.get_manga_page_stream(target_url)
     
-    if chapter_id is not None and page is not None:
-        background_tasks.add_task(
-            processor.process_from_memory,
-            image_bytes,
-            target_url,
-            chapter_id,
-            page
-        )
+#     if chapter_id is not None and page is not None:
+#         background_tasks.add_task(
+#             processor.process_from_memory,
+#             image_bytes,
+#             target_url,
+#             chapter_id,
+#             page
+#         )
     
-    return Response(content=image_bytes, media_type="image/jpeg")
+#     return Response(content=image_bytes, media_type="image/jpeg")
 
 @router.get("/api/manga/chapter/{chapter_id}/pages")
 def get_chapter_page_urls(chapter_id: str):
