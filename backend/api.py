@@ -341,7 +341,7 @@ def get_chapter_page_urls(chapter_id: str):
 async def proxy_manga_cover_art(manga_id: str, file_name: str, size: int = 256):
     url = f"https://uploads.mangadex.org/covers/{manga_id}/{file_name}.{size}.jpg"
     print(url)
-    return await proxy_image(url)
+    return await proxy.get_manga_page_stream(url)
 
 
 @router.get("/api/manga/{manga_id}/cover")
