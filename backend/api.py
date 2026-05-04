@@ -3,12 +3,15 @@ Read-only API for the frontend. Wraps db list_entries, get_panels, get_chapter_p
 Run from backend:  uvicorn api:app --reload --host 0.0.0.0 --port 8000
 """
 
-from fastapi import APIRouter, FastAPI, HTTPException, Query, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Response, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import proxy
 from services import mangadex_service
 from services.image_processor import ImageProcessor
+from services.bubble_detector_kiuyha_service import Bubble_Detector_Kiuyha_Service
+from services.translate_qwen_service import Translate_Qwen_Service
+from manga_ocr import MangaOcr
 import httpx
 import db
 from sqlalchemy.exc import IntegrityError
@@ -42,6 +45,14 @@ from db.schemas import (
 # )
 
 router = APIRouter()
+bubble_detector = Bubble_Detector_Kiuyha_Service()
+ocr_model = MangaOcr()
+translate_model = Translate_Qwen_Service()
+processor = ImageProcessor(
+    bubble_detector=bubble_detector,
+    ocr_model=ocr_model,
+    translate_model=translate_model
+)
 
 BACKEND_URL = "https://tonyliu404-manglify-backend.hf.space"
 
@@ -298,8 +309,18 @@ def patch_me_display_name(ctx: CurrentAuthContext, body: UserDisplayNamePatchIn)
 
 
 @router.get("/api/proxy/image")
-async def proxy_image(target_url: str):
-    return await proxy.get_manga_page_stream(target_url)
+async def proxy_image(target_url: str, chapter_id: int, page_number: int, background_tasks: BackgroundTasks):
+    image_bytes = await proxy.get_manga_page_stream(target_url)
+    
+    background_tasks.add_task(
+        processor.process_from_memory,
+        image_bytes,
+        target_url,
+        chapter_id=chapter_id,
+        page_number=page_number
+    )
+    
+    return Response(content=image_bytes, media_type="image/jpeg")
 
 @router.get("/api/manga/chapter/{chapter_id}/pages")
 def get_chapter_page_urls(chapter_id: str):
@@ -309,8 +330,8 @@ def get_chapter_page_urls(chapter_id: str):
         raise HTTPException(status_code=404, detail="No pages for this chapter")
     
     proxied_urls = [
-        f"{BACKEND_URL}/api/proxy/image?target_url={url}" 
-        for url in urls
+        f"{BACKEND_URL}/api/proxy/image?target_url={url}&chapter_id={chapter_id}&page={i}" 
+        for i, url in enumerate(urls)
     ]
 
     print(proxied_urls)
