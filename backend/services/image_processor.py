@@ -13,6 +13,7 @@ from pathlib import Path
 from helpers import get_project_root, setup_fonts
 from manga_ocr import MangaOcr
 import httpx
+import traceback
 
 class ImageProcessor:
     def __init__(self, bubble_detector, ocr_model, translate_model):
@@ -42,48 +43,53 @@ class ImageProcessor:
                 os.remove(temp_path)
                 print(f"Cleaned up temp file: {temp_path}")
 
-    def process_from_memory(self, image_bytes: bytes, image_url: str, chapter_id: int, page_number: int):
-        # Convert raw bytes to PIL image
-        img = Image.open(io.BytesIO(image_bytes))
-        
-        width,height = img.size
-        
-        # Bubble detection and OCR
-        bubble_results = self.bubble_detector_model.predict(img)
-        if not bubble_results:
-            print(f"No bubbles detected for {image_url}")
-            return []
-        
-        texts= []
-        for bubble in bubble_results:
-            crop = img.crop((bubble['x1'], bubble['y1'], bubble['x2'], bubble['y2']))
-            # Run the OCR model on the crop
-            text = self.ocr_model.predict(crop)
-            texts.append(text)
-        
-        # Translation    
-        try:
-            print("Translating with cloud Qwen model...")
-            translated = self.translate_model.translate_cloud(texts)
-        except Exception as e:
-            print("API translation failed with Qwen, falling back to local model...")
-            translated = self.translate_model.translate(texts)
+    def process_from_memory(self, image_bytes: bytes, image_url: str, chapter_id: str, page: int):
+        try:   
+            # Convert raw bytes to PIL image
+            img = Image.open(io.BytesIO(image_bytes))
             
-        final_results = []
-        for i, (bubble, orig, trans) in enumerate(zip(bubble_results, texts, translated)):
-            final_results.append({
-                'original_text': orig,
-                'translated_text': trans,
-                'x1': bubble['x1'],
-                'y1': bubble['y1'],
-                'x2': bubble['x2'],
-                'y2': bubble['y2'],
-                'width': width,
-                'height': height,
-                'bubble_index': i
-            })
-        
-        self.save_to_db(final_results, image_url, chapter_id, page_number)
+            width,height = img.size
+            
+            # Bubble detection and OCR
+            bubble_results = self.bubble_detector_model.predict(img)
+            if not bubble_results:
+                print(f"No bubbles detected for {image_url}")
+                return []
+            
+            texts= []
+            for bubble in bubble_results:
+                crop = img.crop((bubble['x1'], bubble['y1'], bubble['x2'], bubble['y2']))
+                # Run the OCR model on the crop
+                text = self.ocr_model.predict(crop)
+                texts.append(text)
+            
+            # Translation    
+            try:
+                print("Translating with cloud Qwen model...")
+                translated = self.translate_model.translate_cloud(texts)
+            except Exception as e:
+                print("API translation failed with Qwen, falling back to local model...")
+                translated = self.translate_model.translate(texts)
+                
+            final_results = []
+            for i, (bubble, orig, trans) in enumerate(zip(bubble_results, texts, translated)):
+                final_results.append({
+                    'original_text': orig,
+                    'translated_text': trans,
+                    'x1': bubble['x1'],
+                    'y1': bubble['y1'],
+                    'x2': bubble['x2'],
+                    'y2': bubble['y2'],
+                    'width': width,
+                    'height': height,
+                    'bubble_index': i
+                })
+            
+            self.save_to_db(final_results, image_url, chapter_id, page)
+            print(f"Processed and saved results for {image_url}")
+        except Exception as e:
+            print(f"Background task failed: Error processing image from memory: {e}")
+            traceback.print_exc()
         
     def save_to_db(self, results, url, chapter_id, page_number):
         engine = db.get_engine()

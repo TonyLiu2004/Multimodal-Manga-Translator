@@ -13,6 +13,7 @@ from services.bubble_detector_kiuyha_service import Bubble_Detector_Kiuyha_Servi
 from services.translate_qwen_service import Translate_Qwen_Service
 from manga_ocr import MangaOcr
 import httpx
+import urllib.parse
 import db
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, text
@@ -29,6 +30,8 @@ from db.schemas import (
     PanelListOut,
     UserDisplayNamePatchIn,
 )
+from fastapi import Query
+from typing import Optional
 
 # app = FastAPI(
 #     title="Manga Translator API",
@@ -309,16 +312,22 @@ def patch_me_display_name(ctx: CurrentAuthContext, body: UserDisplayNamePatchIn)
 
 
 @router.get("/api/proxy/image")
-async def proxy_image(target_url: str, chapter_id: int, page_number: int, background_tasks: BackgroundTasks):
+async def proxy_image(
+    background_tasks: BackgroundTasks,
+    target_url: str = Query(...), 
+    chapter_id: Optional[str] = Query(None),
+    page: Optional[int] = Query(None)
+):
     image_bytes = await proxy.get_manga_page_stream(target_url)
     
-    background_tasks.add_task(
-        processor.process_from_memory,
-        image_bytes,
-        target_url,
-        chapter_id=chapter_id,
-        page_number=page_number
-    )
+    if chapter_id is not None and page is not None:
+        background_tasks.add_task(
+            processor.process_from_memory,
+            image_bytes,
+            target_url,
+            chapter_id,
+            page
+        )
     
     return Response(content=image_bytes, media_type="image/jpeg")
 
@@ -330,7 +339,7 @@ def get_chapter_page_urls(chapter_id: str):
         raise HTTPException(status_code=404, detail="No pages for this chapter")
     
     proxied_urls = [
-        f"{BACKEND_URL}/api/proxy/image?target_url={url}&chapter_id={chapter_id}&page={i}" 
+        f"{BACKEND_URL}/api/proxy/image?target_url={urllib.parse.quote_plus(url)}&chapter_id={chapter_id}&page={i}" 
         for i, url in enumerate(urls)
     ]
 
