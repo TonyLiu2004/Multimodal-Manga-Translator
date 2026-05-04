@@ -162,6 +162,7 @@ async def translate_manga_panel(request: TranslationRequest):
         return {"status": "success", "data": results}
     except Exception as e:
         print(f"Translation Route Error: {e}")
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     # processor.process_image("./test_1.jpg", "")
