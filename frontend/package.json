@@ -4,11 +4,11 @@
   "version": "1.0.0",
   "scripts": {
     "postinstall": "node ./scripts/ensure-ionicons-font.js",
-    "start": "expo start",
+    "start": "node ./scripts/ensure-ionicons-font.js && expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
+    "web": "node ./scripts/ensure-ionicons-font.js && expo start --web",
     "lint": "expo lint",
     "build": "node ./scripts/ensure-ionicons-font.js && npx expo export -p web"
   },

@@ -13,26 +13,16 @@ import { type Href, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getSupabase } from "@/lib/supabase";
 
-function formatSignUpError(err: { message: string }): string {
-  const m = err.message.toLowerCase();
-  if (
-    m.includes("already registered") ||
-    m.includes("already been registered") ||
-    m.includes("user already exists") ||
-    m.includes("email address is already") ||
-    m.includes("duplicate")
-  ) {
-    return "That email already has an account. Sign in instead.";
+function resetRedirectUrl(): string | undefined {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    return `${window.location.origin}/reset-password`;
   }
-  return err.message;
+  return undefined;
 }
 
-export default function SignUpScreen() {
+export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,49 +35,26 @@ export default function SignUpScreen() {
     setError(null);
 
     const trimmed = email.trim();
-    if (!trimmed || !password) {
-      setError("Enter email and password.");
-      return;
-    }
-    if (password !== confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (!trimmed) {
+      setError("Enter your account email.");
       return;
     }
 
     submittingRef.current = true;
     setLoading(true);
     try {
-      const supabase = getSupabase();
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: trimmed,
-        password,
-      });
-
-      if (signUpError) {
-        setError(formatSignUpError(signUpError));
-        return;
-      }
-
-      // Supabase may return 200 with a user but no new identity when the email is already registered.
-      const identities = data.user?.identities;
-      if (data.user && (!identities || identities.length === 0)) {
-        setError("That email already has an account. Sign in instead.");
-        return;
-      }
-
-      if (data.session) {
-        setMessage("Account created. You are signed in.");
-        router.replace("/" as Href);
-        return;
-      }
-
-      setMessage(
-        "Account created. Sign in with your email and password.",
+      const redirectTo = resetRedirectUrl();
+      const { error: resetError } = await getSupabase().auth.resetPasswordForEmail(
+        trimmed,
+        redirectTo ? { redirectTo } : undefined,
       );
+
+      if (resetError) {
+        setError(resetError.message);
+        return;
+      }
+
+      setMessage("Check your email for a password reset link.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -109,7 +76,11 @@ export default function SignUpScreen() {
           <Pressable onPress={() => router.push("/" as Href)}>
             <Text style={styles.textCenter}>Manglify</Text>
           </Pressable>
-          <Text style={styles.title}>Create account</Text>
+          <Text style={styles.title}>Reset password</Text>
+          <Text style={styles.hint}>
+            Enter your email and we{"'"}ll send you a link to choose a new
+            password.
+          </Text>
 
           <TextInput
             style={styles.input}
@@ -120,30 +91,6 @@ export default function SignUpScreen() {
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Display name (optional)"
-            placeholderTextColor="#999"
-            value={displayName}
-            onChangeText={setDisplayName}
-            autoCapitalize="words"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password (min 6 characters)"
-            placeholderTextColor="#999"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm password"
-            placeholderTextColor="#999"
-            secureTextEntry
-            value={confirm}
-            onChangeText={setConfirm}
           />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -157,7 +104,7 @@ export default function SignUpScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Sign up</Text>
+              <Text style={styles.buttonText}>Send reset link</Text>
             )}
           </Pressable>
 
@@ -165,9 +112,8 @@ export default function SignUpScreen() {
             onPress={() => router.push("/sign-in")}
             style={styles.linkWrap}
           >
-            <Text style={styles.link}>Already have an account? Sign in</Text>
+            <Text style={styles.link}>Back to sign in</Text>
           </Pressable>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -184,16 +130,17 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  title: {
-    fontSize: 28,
-    marginBottom: 20,
-    color: "#111",
-  },
   textCenter: {
     fontSize: 32,
     fontWeight: "bold",
-    flexShrink: 1,
+    color: "#111",
     textAlign: "center",
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 28,
+    marginBottom: 12,
+    color: "#111",
   },
   hint: {
     fontSize: 14,
@@ -226,5 +173,4 @@ const styles = StyleSheet.create({
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   linkWrap: { marginTop: 20, alignItems: "center" },
   link: { fontSize: 15, color: "#1565c0" },
-  muted: { fontSize: 14, color: "#888", marginTop: 12 },
 });

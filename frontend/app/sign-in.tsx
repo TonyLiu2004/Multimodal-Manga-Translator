@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -19,8 +19,11 @@ export default function SignInScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   const onSubmit = async () => {
+    if (submittingRef.current) return;
+
     setError(null);
 
     const trimmed = email.trim();
@@ -29,6 +32,7 @@ export default function SignInScreen() {
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     try {
       const supabase = getSupabase();
@@ -46,6 +50,7 @@ export default function SignInScreen() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
@@ -96,6 +101,13 @@ export default function SignInScreen() {
             ) : (
               <Text style={styles.buttonText}>Sign in</Text>
             )}
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/forgot-password" as Href)}
+            style={styles.forgotWrap}
+          >
+            <Text style={styles.link}>Forgot password?</Text>
           </Pressable>
 
           <Pressable
@@ -154,6 +166,7 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  forgotWrap: { marginTop: 14, alignItems: "center" },
   linkWrap: { marginTop: 20, alignItems: "center" },
   link: { fontSize: 15, color: "#1565c0" },
   muted: { fontSize: 14, color: "#888", marginTop: 12 },

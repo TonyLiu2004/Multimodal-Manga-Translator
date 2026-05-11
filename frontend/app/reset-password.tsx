@@ -9,28 +9,12 @@ import {
   Text,
   TextInput,
 } from "react-native";
-import { type Href, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getSupabase } from "@/lib/supabase";
 
-function formatSignUpError(err: { message: string }): string {
-  const m = err.message.toLowerCase();
-  if (
-    m.includes("already registered") ||
-    m.includes("already been registered") ||
-    m.includes("user already exists") ||
-    m.includes("email address is already") ||
-    m.includes("duplicate")
-  ) {
-    return "That email already has an account. Sign in instead.";
-  }
-  return err.message;
-}
-
-export default function SignUpScreen() {
+export default function ResetPasswordScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,9 +28,8 @@ export default function SignUpScreen() {
     setMessage(null);
     setError(null);
 
-    const trimmed = email.trim();
-    if (!trimmed || !password) {
-      setError("Enter email and password.");
+    if (!password) {
+      setError("Enter a new password.");
       return;
     }
     if (password !== confirm) {
@@ -62,32 +45,17 @@ export default function SignUpScreen() {
     setLoading(true);
     try {
       const supabase = getSupabase();
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: trimmed,
+      const { error: updateError } = await supabase.auth.updateUser({
         password,
       });
 
-      if (signUpError) {
-        setError(formatSignUpError(signUpError));
+      if (updateError) {
+        setError(updateError.message);
         return;
       }
 
-      // Supabase may return 200 with a user but no new identity when the email is already registered.
-      const identities = data.user?.identities;
-      if (data.user && (!identities || identities.length === 0)) {
-        setError("That email already has an account. Sign in instead.");
-        return;
-      }
-
-      if (data.session) {
-        setMessage("Account created. You are signed in.");
-        router.replace("/" as Href);
-        return;
-      }
-
-      setMessage(
-        "Account created. Sign in with your email and password.",
-      );
+      await supabase.auth.signOut();
+      setMessage("Password updated. Sign in with your new password.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -106,32 +74,15 @@ export default function SignUpScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scroll}
         >
-          <Pressable onPress={() => router.push("/" as Href)}>
-            <Text style={styles.textCenter}>Manglify</Text>
-          </Pressable>
-          <Text style={styles.title}>Create account</Text>
+          <Text style={styles.textCenter}>Manglify</Text>
+          <Text style={styles.title}>Choose a new password</Text>
+          <Text style={styles.hint}>
+            This page works from the password reset email link.
+          </Text>
 
           <TextInput
             style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#999"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Display name (optional)"
-            placeholderTextColor="#999"
-            value={displayName}
-            onChangeText={setDisplayName}
-            autoCapitalize="words"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password (min 6 characters)"
+            placeholder="New password"
             placeholderTextColor="#999"
             secureTextEntry
             value={password}
@@ -139,7 +90,7 @@ export default function SignUpScreen() {
           />
           <TextInput
             style={styles.input}
-            placeholder="Confirm password"
+            placeholder="Confirm new password"
             placeholderTextColor="#999"
             secureTextEntry
             value={confirm}
@@ -157,17 +108,16 @@ export default function SignUpScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Sign up</Text>
+              <Text style={styles.buttonText}>Update password</Text>
             )}
           </Pressable>
 
           <Pressable
-            onPress={() => router.push("/sign-in")}
+            onPress={() => router.replace("/sign-in")}
             style={styles.linkWrap}
           >
-            <Text style={styles.link}>Already have an account? Sign in</Text>
+            <Text style={styles.link}>Back to sign in</Text>
           </Pressable>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -184,16 +134,17 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  title: {
-    fontSize: 28,
-    marginBottom: 20,
-    color: "#111",
-  },
   textCenter: {
     fontSize: 32,
     fontWeight: "bold",
-    flexShrink: 1,
+    color: "#111",
     textAlign: "center",
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 28,
+    marginBottom: 12,
+    color: "#111",
   },
   hint: {
     fontSize: 14,
@@ -226,5 +177,4 @@ const styles = StyleSheet.create({
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   linkWrap: { marginTop: 20, alignItems: "center" },
   link: { fontSize: 15, color: "#1565c0" },
-  muted: { fontSize: 14, color: "#888", marginTop: 12 },
 });

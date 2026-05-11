@@ -9,7 +9,10 @@ export async function fetchMangaCoverUrl(
   );
   if (!res.ok) return null;
   const j = (await res.json()) as { cover_url?: string | null };
-  return typeof j.cover_url === "string" && j.cover_url.length > 0
-    ? j.cover_url
-    : null;
+  if (typeof j.cover_url !== "string" || j.cover_url.length === 0) {
+    return null;
+  }
+  return `${BACKEND_URL}/api/proxy/image?target_url=${encodeURIComponent(
+    j.cover_url,
+  )}`;
 }
