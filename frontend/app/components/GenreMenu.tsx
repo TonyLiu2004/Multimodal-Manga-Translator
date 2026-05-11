@@ -121,14 +121,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   genreBadge: {
-    backgroundColor: "#333",
+    backgroundColor: "#1f1e32",
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
     marginHorizontal: 5, 
   },
   sortBadge: {
-    backgroundColor: "#555",
+    backgroundColor: "#1f1e32",
   },
   genreText: {
     color: "#fff",

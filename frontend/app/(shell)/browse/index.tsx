@@ -167,9 +167,9 @@ const BrowsePage = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "white" },
+  container: { flex: 1, backgroundColor: "#33384e" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  listContainer: { width: "100%", paddingBottom: 20 },
+  listContainer: { width: "100%", paddingBottom: 20, backgroundColor: "transparent" },
   columnWrapper: { gap: 0, marginBottom: 0 },
   webCardWrapper: { flex: 1 },
   empty: { color: "#888", textAlign: "center", marginTop: 50 },
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   pageButtonText: {
-    color: "black",
+    color: "#1f1e32",
     fontWeight: "600",
     fontSize: 16,
   },
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   pageText: {
-    color: "black",
+    color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
   },

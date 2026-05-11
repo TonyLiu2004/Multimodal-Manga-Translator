@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#e5e7eb",
-    backgroundColor: "#fff",
+    backgroundColor: "#33384e",
     minHeight: 200,
   },
   pressed: {
@@ -113,12 +113,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#111827",
+    color: "#fff",
     marginBottom: 6,
   },
   description: {
     fontSize: 15,
-    color: "#6b7280",
+    color: "#a8b1c2",
     lineHeight: 19,
     marginBottom: 8,
   },

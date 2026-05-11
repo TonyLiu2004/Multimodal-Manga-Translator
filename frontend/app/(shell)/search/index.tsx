@@ -97,7 +97,7 @@ export default function SearchPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#33384e",
   },
   header: {
     padding: 20,
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
-    color: "#333",
+    color: "#fff",
   },
   center: {
     flex: 1,

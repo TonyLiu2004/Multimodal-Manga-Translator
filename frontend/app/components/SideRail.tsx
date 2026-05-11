@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 /** Exported so other layouts can match available width beside the shell rail. */
 export const SIDE_RAIL_WIDTH = 56;
 const ICON_SZ = 26;
-const ICON_COLOR = "#6b7280";
+const ICON_COLOR = "#c5d0e7";
 const ICON_ACTIVE = "#2563eb";
 
 export default function SideRail() {
@@ -165,9 +165,9 @@ export default function SideRail() {
 
 const styles = StyleSheet.create({
   rail: {
-    backgroundColor: "#fff",
+    backgroundColor: "#151045",
     borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: "#e5e7eb",
+    borderRightColor: "#0e0935",
     alignItems: "center",
   },
   underHomeGap: {

@@ -25,12 +25,12 @@ const styles = StyleSheet.create({
   wide: {
     flex: 1,
     flexDirection: "row",
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#1f1e32",
   },
   mobile: {
     flex: 1,
     flexDirection: "column",
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#1f1e32",
   },
   main: {
     flex: 1,

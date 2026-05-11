@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   mangaTitle: {
     fontSize: 14,
     fontWeight: "bold",
-    color: "#333",
+    color: "#ffffff",
   },
   genreRow: {
     flexDirection: "row",
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   },
   genreText: {
     fontSize: 11,
-    color: "#666",
+    color: "#a7a7a7",
   },
 });
 

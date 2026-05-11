@@ -1,4 +1,4 @@
-import { Text, ScrollView, StyleSheet } from "react-native";
+import { Text, ScrollView, StyleSheet, View } from "react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import MangaCarousel from "./MangaCarousel";
 import MangaCategoryList from "./MangaCategoryList";
@@ -87,30 +87,36 @@ export default function Index() {
 
   return (
     <ScrollView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: "#1f1e32" }}
       contentContainerStyle={{
-        alignItems: "center",
-        padding: 20,
+        alignItems: "stretch",
       }}
     >
-      <Text style={styles.h1}>Manglify</Text>
-
-      <SearchBar
-        placeholder="Search manga..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        onSubmitEditing={handleSearch}
-      />
-
+      <View 
+        style={{backgroundColor: "#33384e", gap: 30}}
+      >
+        <View style={styles.top}>
+          <Text style={styles.h1}>Manglify</Text>
+          <SearchBar
+            placeholder="Search manga..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
+          />
+        </View>
+      
       <MangaCarousel data={popularManga} />
-      <MangaCategoryList title="Recently Updated" data={recentManga} />
-      <MangaCategoryList title="Action" data={actionManga} />
-      <MangaCategoryList title="Romance" data={romanceManga} />
-      <MangaCategoryList title="Sports" data={sportsManga} />
-      <MangaCategoryList title="Comedy" data={comedyManga} />
-      <MangaCategoryList title="Horror" data={horrorManga} />
-      <MangaCategoryList title="Sci-Fi" data={sciFiManga} />
-      <MangaCategoryList title="Slice of Life" data={sliceOfLifeManga} />
+      </View>
+      <View style={{ paddingHorizontal: 20}}>
+        <MangaCategoryList title="Recently Updated" data={recentManga} />
+        <MangaCategoryList title="Action" data={actionManga} />
+        <MangaCategoryList title="Romance" data={romanceManga} />
+        <MangaCategoryList title="Sports" data={sportsManga} />
+        <MangaCategoryList title="Comedy" data={comedyManga} />
+        <MangaCategoryList title="Horror" data={horrorManga} />
+        <MangaCategoryList title="Sci-Fi" data={sciFiManga} />
+        <MangaCategoryList title="Slice of Life" data={sliceOfLifeManga} />
+      </View>
     </ScrollView>
   );
 }
@@ -120,6 +126,14 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "bold",
     flexShrink: 1,
-    
+    color: "#fff"
   },
+  top: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingTop: "2%",
+    paddingHorizontal: "5%",
+  }
 });
