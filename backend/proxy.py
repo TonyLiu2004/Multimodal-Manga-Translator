@@ -7,7 +7,7 @@ client = httpx.AsyncClient(timeout=10.0)
 # async def get_manga_page_stream(target_url: str):
 #     try:
 #         stream = client.stream("GET", target_url)
-#         response = await stream.__aenter__() 
+#         response = await stream.__aenter__()
 #     except httpx.RequestError:
 #         raise HTTPException(status_code=502, detail="Upstream request failed")
 
@@ -29,7 +29,7 @@ client = httpx.AsyncClient(timeout=10.0)
 
 async def get_manga_page_stream(target_url: str):
     req = client.build_request("GET", target_url)
-    
+
     try:
         response = await client.send(req, stream=True)
     except httpx.RequestError:

@@ -384,6 +384,15 @@ async def get_manga_cover_json(manga_id: str):
     return {"cover_url": cover_url}
 
 
+@router.get("/api/manga/{manga_id}/cover-image")
+async def get_manga_cover_image(manga_id: str):
+    """Resolve and stream a MangaDex cover from the backend to avoid hotlink blocks."""
+    cover_url = await mangadex_service.get_manga_cover_url_256(manga_id)
+    if not cover_url:
+        raise HTTPException(status_code=404, detail="Cover not found")
+    return await proxy.get_manga_page_stream(cover_url)
+
+
 @router.get("/api/manga/{manga_id}/info")
 async def get_manga_info_json(manga_id: str):
     """MangaDex title + synopsis for reading-list rows (no DB storage)."""
