@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   },
   resultsCount: {
     fontSize: 16,
-    color: "#666",
+    color: "#d3d3d3",
     marginBottom: 10,
   },
   listContainer: {
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   },
   mangaRow: {
     marginBottom: 30,
-    backgroundColor: "#fff",
+    backgroundColor: "#33384e",
     borderRadius: 8,
     padding: 10,
     // Add a slight shadow for better UI
@@ -100,6 +100,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 5,
+    color: "#fff"
   },
   idText: {
     color: "gray",
@@ -108,7 +109,7 @@ const styles = StyleSheet.create({
   },
   description: {
     lineHeight: 20,
-    color: "#333",
+    color: "#bebebe",
   },
 });
 
